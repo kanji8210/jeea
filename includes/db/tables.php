@@ -22,6 +22,18 @@ function construction_mgmt_table_exists($table_name) {
     return !empty($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_name)));
 }
 
+function construction_mgmt_find_existing_table_name($target_table_name, $legacy_table_name = null) {
+    if (construction_mgmt_table_exists($target_table_name)) {
+        return $target_table_name;
+    }
+
+    if (!empty($legacy_table_name) && construction_mgmt_table_exists($legacy_table_name)) {
+        return $legacy_table_name;
+    }
+
+    return null;
+}
+
 function construction_mgmt_get_table_name($table_key) {
     $tables = construction_mgmt_get_required_table_sql();
     if (!isset($tables[$table_key])) {
@@ -30,16 +42,9 @@ function construction_mgmt_get_table_name($table_key) {
 
     $primary_table = $tables[$table_key]['table_name'];
     $legacy_table = isset($tables[$table_key]['legacy_table_name']) ? $tables[$table_key]['legacy_table_name'] : null;
+    $active_table = construction_mgmt_find_existing_table_name($primary_table, $legacy_table);
 
-    if (construction_mgmt_table_exists($primary_table)) {
-        return $primary_table;
-    }
-
-    if (!empty($legacy_table) && construction_mgmt_table_exists($legacy_table)) {
-        return $legacy_table;
-    }
-
-    return $primary_table;
+    return $active_table ?: $primary_table;
 }
 
 function construction_mgmt_get_required_table_sql() {
@@ -833,6 +838,33 @@ function construction_mgmt_get_required_table_sql() {
                 FOREIGN KEY (project_id) REFERENCES {$table_prefix}projects(id) ON DELETE CASCADE
             ) {$charset_collate};",
         ],
+        'mpesa_transactions' => [
+            'label' => 'M-Pesa Transactions',
+            'table_name' => $table_prefix . 'mpesa_transactions',
+            'required_columns' => [
+                'id', 'merchant_request_id', 'checkout_request_id', 'result_code', 'result_desc',
+                'amount', 'mpesa_receipt_number', 'phone_number', 'transaction_date',
+                'payment_status', 'raw_payload', 'created_at', 'updated_at',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}mpesa_transactions (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                merchant_request_id VARCHAR(190),
+                checkout_request_id VARCHAR(190),
+                result_code INT,
+                result_desc TEXT,
+                amount DECIMAL(12,2) DEFAULT 0.00,
+                mpesa_receipt_number VARCHAR(100),
+                phone_number VARCHAR(50),
+                transaction_date VARCHAR(32),
+                payment_status ENUM('pending','success','failed') DEFAULT 'pending',
+                raw_payload LONGTEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                KEY merchant_request_id (merchant_request_id),
+                KEY checkout_request_id (checkout_request_id),
+                KEY payment_status (payment_status)
+            ) {$charset_collate};",
+        ],
         'audit_log' => [
             'label' => 'Audit Log',
             'table_name' => $table_prefix . 'audit_log',
@@ -975,6 +1007,7 @@ function construction_mgmt_get_table_harmonization_report() {
         'safety_incidents' => 'safety_incidents',
         'rfis' => 'rfis',
         'submittals' => 'submittals',
+        'mpesa_transactions' => 'mpesa_transactions',
         'audit_log' => 'audit_log',
     ];
 

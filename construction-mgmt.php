@@ -41,6 +41,7 @@ require_once CONSTRUCTION_MGMT_PATH . 'includes/security/roles.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/security/validation.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/security/logging.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/security/github-memory.php';
+require_once CONSTRUCTION_MGMT_PATH . 'includes/integrations/mpesa.php';
 
 // Activation / deactivation hooks
 register_activation_hook(__FILE__, 'construction_mgmt_activate');
