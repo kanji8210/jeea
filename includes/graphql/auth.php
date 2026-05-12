@@ -19,6 +19,7 @@ $construction_mgmt_graphql_auth_debug = [
 function construction_mgmt_get_authorization_header() {
     $headers = [];
 
+    // Try getallheaders() first (most common)
     if (function_exists('getallheaders')) {
         $raw_headers = getallheaders();
         if (is_array($raw_headers)) {
@@ -26,18 +27,37 @@ function construction_mgmt_get_authorization_header() {
         }
     }
 
+    // Check all headers for case-insensitive Authorization match
     foreach ($headers as $name => $value) {
         if (strtolower((string) $name) === 'authorization') {
             return (string) $value;
         }
     }
 
+    // Try $_SERVER vars (used when getallheaders() unavailable)
     if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
         return (string) $_SERVER['HTTP_AUTHORIZATION'];
     }
 
     if (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
         return (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
+
+    // Try "Authorization" without HTTP_ prefix (some configs)
+    if (!empty($_SERVER['Authorization'])) {
+        return (string) $_SERVER['Authorization'];
+    }
+
+    // Try GraphQL context if running via WPGraphQL
+    if (function_exists('graphql_get_request_data')) {
+        $graphql_headers = graphql_get_request_data()['headers'] ?? [];
+        if (is_array($graphql_headers)) {
+            foreach ($graphql_headers as $name => $value) {
+                if (strtolower((string) $name) === 'authorization') {
+                    return (string) $value;
+                }
+            }
+        }
     }
 
     return '';
