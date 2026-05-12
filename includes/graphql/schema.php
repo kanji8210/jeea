@@ -147,6 +147,20 @@ add_action('graphql_register_types', function() {
         ],
     ]);
 
+    register_graphql_object_type('GraphQLAuthDebug', [
+        'description' => 'Debug details for current GraphQL authentication context',
+        'fields' => [
+            'isAuthenticated' => ['type' => 'Boolean'],
+            'userId' => ['type' => 'Int'],
+            'userLogin' => ['type' => 'String'],
+            'roles' => ['type' => ['list_of' => 'String']],
+            'canReadProjects' => ['type' => 'Boolean'],
+            'canCreateProjects' => ['type' => 'Boolean'],
+            'canManageConstructionProjects' => ['type' => 'Boolean'],
+            'canManageOptions' => ['type' => 'Boolean'],
+        ],
+    ]);
+
     // Query: projects
     register_graphql_field('RootQuery', 'projects', [
         'type' => ['list_of' => 'ConstructionProject'],
@@ -163,6 +177,27 @@ add_action('graphql_register_types', function() {
             }
             return $wpdb->get_results($sql, ARRAY_A);
         }
+    ]);
+
+    // Query: authDebug
+    register_graphql_field('RootQuery', 'authDebug', [
+        'type' => 'GraphQLAuthDebug',
+        'resolve' => function() {
+            $user = wp_get_current_user();
+            $user_id = get_current_user_id();
+            $is_authenticated = $user_id > 0 && $user && $user->exists();
+
+            return [
+                'isAuthenticated' => $is_authenticated,
+                'userId' => $is_authenticated ? (int) $user_id : 0,
+                'userLogin' => $is_authenticated ? (string) $user->user_login : '',
+                'roles' => $is_authenticated ? array_values((array) $user->roles) : [],
+                'canReadProjects' => current_user_can('read_projects'),
+                'canCreateProjects' => current_user_can('create_projects'),
+                'canManageConstructionProjects' => current_user_can('manage_construction_projects'),
+                'canManageOptions' => current_user_can('manage_options'),
+            ];
+        },
     ]);
 
     // Query: project (single)
