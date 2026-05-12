@@ -217,5 +217,39 @@ function construction_mgmt_apply_graphql_jwt_auth() {
     ]);
 }
 
+function construction_mgmt_apply_cors_headers() {
+    if (!function_exists('graphql_get_wp_context')) {
+        return;
+    }
+
+    $origin = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_url((string) $_SERVER['HTTP_ORIGIN']) : '';
+    if ($origin === '') {
+        return;
+    }
+
+    $allowed_origins = [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+        'http://127.0.0.1:5175',
+    ];
+
+    if (in_array($origin, $allowed_origins, true)) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS, HEAD, PUT, DELETE, PATCH');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept');
+        header('Access-Control-Max-Age: 86400');
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        status_header(204);
+        exit;
+    }
+}
+
+add_action('init', 'construction_mgmt_apply_cors_headers', 0);
 add_action('init', 'construction_mgmt_apply_graphql_jwt_auth', 1);
 add_action('graphql_init', 'construction_mgmt_apply_graphql_jwt_auth', 1);
