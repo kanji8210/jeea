@@ -27,6 +27,7 @@ function construction_mgmt_db_tools_page() {
     construction_mgmt_handle_db_tools_actions();
 
     $table_statuses = construction_mgmt_get_required_tables_status();
+    $harmonization = construction_mgmt_get_table_harmonization_report();
     $created_count = 0;
     $missing_count = 0;
     $needs_fixing_count = 0;
@@ -51,6 +52,11 @@ function construction_mgmt_db_tools_page() {
         'Created' => '#1d6f42',
         'Needs Creating' => '#8a6d1f',
         'Needs Fixing' => '#9e2a2b',
+        'Aligned' => '#1d6f42',
+        'Legacy Active' => '#b32d2e',
+        'Legacy Needs Fixing' => '#8a4f00',
+        'Defined in registry' => '#2271b1',
+        'Missing from registry' => '#8a6d1f',
     ];
     ?>
     <div class="wrap">
@@ -90,6 +96,34 @@ function construction_mgmt_db_tools_page() {
             </tbody>
         </table>
 
+        <h2 style="margin-top: 24px;">JINSING Schema Harmonization</h2>
+        <p>Target schema coverage against the requested <code>jinsing_*</code> model. This compares the current registry to the desired table catalog without renaming live tables yet.</p>
+
+        <table class="widefat striped" style="max-width: 900px; margin-top: 16px;">
+            <tbody>
+                <tr>
+                    <th style="width: 280px;">Target Tables</th>
+                    <td><?php echo esc_html((string) $harmonization['target_total']); ?></td>
+                </tr>
+                <tr>
+                    <th>Implemented in Current Registry</th>
+                    <td><?php echo esc_html((string) $harmonization['implemented_total']); ?></td>
+                </tr>
+                <tr>
+                    <th>Missing from Current Registry</th>
+                    <td><?php echo esc_html((string) $harmonization['missing_total']); ?></td>
+                </tr>
+                <tr>
+                    <th>Rename Pending</th>
+                    <td><?php echo esc_html((string) $harmonization['rename_pending_total']); ?></td>
+                </tr>
+                <tr>
+                    <th>Legacy / Extra Registry Tables</th>
+                    <td><?php echo esc_html((string) $harmonization['extra_registry_total']); ?></td>
+                </tr>
+            </tbody>
+        </table>
+
         <form method="post" style="margin-top: 16px;">
             <?php wp_nonce_field('construction_mgmt_db_tools_action'); ?>
             <input type="hidden" name="construction_mgmt_db_tools_action" value="sync_all" />
@@ -101,6 +135,7 @@ function construction_mgmt_db_tools_page() {
             <span class="construction-mgmt-status-badge" style="background-color: #1d6f42;">Created</span>
             <span class="construction-mgmt-status-badge" style="background-color: #8a6d1f;">Needs Creating</span>
             <span class="construction-mgmt-status-badge" style="background-color: #9e2a2b;">Needs Fixing</span>
+            <span class="construction-mgmt-status-badge" style="background-color: #b32d2e;">Legacy Active</span>
         </div>
 
         <h2 style="margin-top: 24px;">Required Table Status</h2>
@@ -108,7 +143,8 @@ function construction_mgmt_db_tools_page() {
             <thead>
                 <tr>
                     <th>Label</th>
-                    <th>Table Name</th>
+                    <th>Target Table</th>
+                    <th>Active Table</th>
                     <th>Status</th>
                     <th>Missing Columns</th>
                 </tr>
@@ -118,6 +154,13 @@ function construction_mgmt_db_tools_page() {
                     <tr>
                         <td><?php echo esc_html($status['label']); ?></td>
                         <td><code><?php echo esc_html($status['table_name']); ?></code></td>
+                        <td>
+                            <?php if (!empty($status['active_table_name'])) : ?>
+                                <code><?php echo esc_html($status['active_table_name']); ?></code>
+                            <?php else : ?>
+                                -
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <?php
                             $badge_color = isset($badge_colors[$status['status_label']]) ? $badge_colors[$status['status_label']] : '#50575e';
@@ -139,6 +182,64 @@ function construction_mgmt_db_tools_page() {
                 <?php endforeach; ?>
             </tbody>
         </table>
+
+        <h2 style="margin-top: 24px;">Target Table Coverage</h2>
+        <table class="widefat striped" style="max-width: 1300px;">
+            <thead>
+                <tr>
+                    <th>Module</th>
+                    <th>Target Table</th>
+                    <th>Current Registry Table</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($harmonization['rows'] as $row) : ?>
+                    <tr>
+                        <td><?php echo esc_html($row['module']); ?></td>
+                        <td><code><?php echo esc_html($row['target_table_name']); ?></code></td>
+                        <td>
+                            <?php if (!empty($row['current_table_name'])) : ?>
+                                <code><?php echo esc_html($row['current_table_name']); ?></code>
+                            <?php else : ?>
+                                -
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php
+                            $harmonization_badge_color = isset($badge_colors[$row['status']]) ? $badge_colors[$row['status']] : '#50575e';
+                            ?>
+                            <span class="construction-mgmt-status-badge" style="background-color: <?php echo esc_attr($harmonization_badge_color); ?>;">
+                                <?php echo esc_html($row['status']); ?>
+                            </span>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+
+        <?php if (!empty($harmonization['extra_registry_rows'])) : ?>
+            <h2 style="margin-top: 24px;">Legacy / Extra Registry Tables</h2>
+            <p>These are currently tracked by the plugin but do not map directly to the requested harmonized schema yet.</p>
+            <table class="widefat striped" style="max-width: 1100px;">
+                <thead>
+                    <tr>
+                        <th>Registry Key</th>
+                        <th>Label</th>
+                        <th>Current Table</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($harmonization['extra_registry_rows'] as $row) : ?>
+                        <tr>
+                            <td><code><?php echo esc_html($row['key']); ?></code></td>
+                            <td><?php echo esc_html($row['label']); ?></td>
+                            <td><code><?php echo esc_html($row['table_name']); ?></code></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
     </div>
     <?php
 }

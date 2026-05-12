@@ -4,11 +4,36 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+function construction_mgmt_get_project($project_id) {
+    global $wpdb;
+
+    $project_id = (int) $project_id;
+    if ($project_id <= 0) {
+        return null;
+    }
+
+    $table = construction_mgmt_get_table_name('projects');
+    $row = $wpdb->get_row(
+        $wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $project_id),
+        ARRAY_A
+    );
+
+    if (empty($row)) {
+        return null;
+    }
+
+    $row['id'] = (int) $row['id'];
+    $row['budget_total'] = (float) $row['budget_total'];
+    $row['budget_spent'] = (float) $row['budget_spent'];
+
+    return $row;
+}
+
 function construction_mgmt_get_command_center_summary() {
     global $wpdb;
 
-    $projects_table = $wpdb->prefix . 'const_projects';
-    $rfis_table = $wpdb->prefix . 'const_rfis';
+    $projects_table = construction_mgmt_get_table_name('projects');
+    $rfis_table = construction_mgmt_get_table_name('rfis');
 
     $projects_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $projects_table));
     $rfis_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $rfis_table));
@@ -45,8 +70,8 @@ function construction_mgmt_get_command_center_summary() {
 function construction_mgmt_get_command_center_projects($limit = 25) {
     global $wpdb;
 
-    $projects_table = $wpdb->prefix . 'const_projects';
-    $rfis_table = $wpdb->prefix . 'const_rfis';
+    $projects_table = construction_mgmt_get_table_name('projects');
+    $rfis_table = construction_mgmt_get_table_name('rfis');
 
     $projects_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $projects_table));
     if (!$projects_exists) {
@@ -118,9 +143,9 @@ function construction_mgmt_get_command_center_projects($limit = 25) {
 function construction_mgmt_get_financial_summary() {
     global $wpdb;
 
-    $projects_table = $wpdb->prefix . 'const_projects';
-    $objectives_table = $wpdb->prefix . 'const_project_objectives';
-    $expenditures_table = $wpdb->prefix . 'const_project_expenditures';
+    $projects_table = construction_mgmt_get_table_name('projects');
+    $objectives_table = construction_mgmt_get_table_name('project_objectives');
+    $expenditures_table = construction_mgmt_get_table_name('project_expenditures');
 
     $projects_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $projects_table));
     if (!$projects_exists) {
@@ -176,8 +201,8 @@ function construction_mgmt_get_project_financial_stats($project_id) {
         ];
     }
 
-    $objectives_table = $wpdb->prefix . 'const_project_objectives';
-    $expenditures_table = $wpdb->prefix . 'const_project_expenditures';
+    $objectives_table = construction_mgmt_get_table_name('project_objectives');
+    $expenditures_table = construction_mgmt_get_table_name('project_expenditures');
 
     $objectives_total = 0;
     $expenditures_total = 0;

@@ -2,3 +2,5 @@
 {"event": "link-commit", "entry_id": "ctx-20260511-085825446450-6dbeb402", "commit": "HEAD", "timestamp": "2026-05-11T08:58:25Z"}
 {"event": "record", "entry_id": "ctx-20260511-093911403321-9de7ef66", "category": "feature", "title": "JINSING roles and centralized command center", "timestamp": "2026-05-11T09:39:11Z"}
 {"event": "link-commit", "entry_id": "ctx-20260511-093911403321-9de7ef66", "commit": "HEAD", "timestamp": "2026-05-11T09:39:11Z"}
+{"event": "record", "entry_id": "ctx-20260512-150504968616-bb8e95b0", "category": "decision", "title": "JINSING platform blueprint and target role model", "timestamp": "2026-05-12T15:05:04Z"}
+{"event": "link-commit", "entry_id": "ctx-20260512-150504968616-bb8e95b0", "commit": "42ff8a6", "timestamp": "2026-05-12T15:05:05Z"}

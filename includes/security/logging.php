@@ -6,7 +6,7 @@ function construction_mgmt_audit_log($action, $entity_type, $entity_id, $old_val
     $old_payload = is_array($old_value) ? wp_json_encode($old_value) : $old_value;
     $new_payload = is_array($new_value) ? wp_json_encode($new_value) : $new_value;
 
-    $wpdb->insert($wpdb->prefix . 'const_audit_log', [
+    $wpdb->insert(construction_mgmt_get_table_name('audit_log'), [
         'user_id' => get_current_user_id(),
         'action' => $action,
         'entity_type' => $entity_type,

@@ -7,7 +7,7 @@ if (!defined('ABSPATH')) {
 // Create a new project
 function construction_mgmt_create_project($name, $description, $budget_total, $start_date, $end_date, $created_by) {
     global $wpdb;
-    $table = $wpdb->prefix . 'const_projects';
+    $table = construction_mgmt_get_table_name('projects');
     $wpdb->insert($table, [
         'name' => $name,
         'description' => $description,

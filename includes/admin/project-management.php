@@ -6,7 +6,7 @@ if (!defined('ABSPATH')) {
 
 function construction_mgmt_project_list_page() {
     global $wpdb;
-    $projects_table = $wpdb->prefix . 'const_projects';
+    $projects_table = construction_mgmt_get_table_name('projects');
 
     $projects = $wpdb->get_results("SELECT * FROM $projects_table ORDER BY updated_at DESC");
 
@@ -81,7 +81,7 @@ function construction_mgmt_project_management_page() {
     }
 
     global $wpdb;
-    $projects_table = $wpdb->prefix . 'const_projects';
+    $projects_table = construction_mgmt_get_table_name('projects');
     $project = $wpdb->get_row($wpdb->prepare("SELECT * FROM $projects_table WHERE id = %d", $project_id));
 
     if (!$project) {

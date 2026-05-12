@@ -8,7 +8,7 @@ add_action('graphql_before_execute', function($request) {
     global $wpdb;
     $hour_ago = date('Y-m-d H:i:s', strtotime('-1 hour'));
     $count = $wpdb->get_var($wpdb->prepare(
-        "SELECT COUNT(*) FROM {$wpdb->prefix}const_rate_limit 
+        "SELECT COUNT(*) FROM " . construction_mgmt_get_table_name('rate_limit') . " 
          WHERE (user_id = %d OR ip_address = %s) 
          AND request_time > %s",
         $user_id, $ip, $hour_ago
@@ -17,7 +17,7 @@ add_action('graphql_before_execute', function($request) {
         throw new \GraphQL\Error\UserError('Rate limit exceeded. Try later.');
     }
     // Log this request
-    $wpdb->insert($wpdb->prefix . 'const_rate_limit', [
+    $wpdb->insert(construction_mgmt_get_table_name('rate_limit'), [
         'ip_address' => $ip,
         'user_id' => $user_id,
         'operation_name' => substr($operation, 0, 100),
