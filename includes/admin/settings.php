@@ -118,6 +118,15 @@ function construction_mgmt_settings_page() {
         update_option('construction_mgmt_github_memory_enabled', isset($_POST['github_memory_enabled']) ? 1 : 0);
         update_option('construction_mgmt_github_memory_repo', sanitize_text_field($_POST['github_memory_repo']));
 
+        // Save document branding settings
+        update_option('construction_mgmt_doc_company_name', sanitize_text_field(wp_unslash($_POST['construction_mgmt_doc_company_name'] ?? '')));
+        update_option('construction_mgmt_doc_company_address', sanitize_textarea_post(wp_unslash($_POST['construction_mgmt_doc_company_address'] ?? '')));
+        update_option('construction_mgmt_doc_company_phone', sanitize_text_field(wp_unslash($_POST['construction_mgmt_doc_company_phone'] ?? '')));
+        update_option('construction_mgmt_doc_company_email', sanitize_email(wp_unslash($_POST['construction_mgmt_doc_company_email'] ?? '')));
+        update_option('construction_mgmt_doc_company_kra_pin', sanitize_text_field(wp_unslash($_POST['construction_mgmt_doc_company_kra_pin'] ?? '')));
+        update_option('construction_mgmt_doc_logo_url', esc_url_raw(wp_unslash($_POST['construction_mgmt_doc_logo_url'] ?? '')));
+        update_option('construction_mgmt_doc_footer_text', sanitize_textarea_post(wp_unslash($_POST['construction_mgmt_doc_footer_text'] ?? '')));
+
         foreach ($integration_fields as $option_key => $meta) {
             $field_type = $meta['type'];
 
@@ -369,6 +378,39 @@ function construction_mgmt_settings_page() {
                 <tr>
                     <th scope="row"><label for="construction_mgmt_weather_base_url">Weather API Base URL</label></th>
                     <td><input type="url" name="construction_mgmt_weather_base_url" id="construction_mgmt_weather_base_url" value="<?php echo esc_attr((string) get_option('construction_mgmt_weather_base_url', '')); ?>" class="regular-text" /></td>
+                </tr>
+
+                <tr><th colspan="2"><h3 style="margin: 12px 0 0;">Document Branding & Templates</h3></th></tr>
+                <tr>
+                    <th scope="row"><label for="construction_mgmt_doc_company_name">Company Name</label></th>
+                    <td><input type="text" name="construction_mgmt_doc_company_name" id="construction_mgmt_doc_company_name" value="<?php echo esc_attr((string) get_option('construction_mgmt_doc_company_name', '')); ?>" class="regular-text" placeholder="Used on invoices, receipts, quotes" /></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="construction_mgmt_doc_company_address">Company Address</label></th>
+                    <td><textarea name="construction_mgmt_doc_company_address" id="construction_mgmt_doc_company_address" class="large-text" rows="3"><?php echo esc_textarea((string) get_option('construction_mgmt_doc_company_address', '')); ?></textarea></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="construction_mgmt_doc_company_phone">Company Phone</label></th>
+                    <td><input type="tel" name="construction_mgmt_doc_company_phone" id="construction_mgmt_doc_company_phone" value="<?php echo esc_attr((string) get_option('construction_mgmt_doc_company_phone', '')); ?>" class="regular-text" /></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="construction_mgmt_doc_company_email">Company Email</label></th>
+                    <td><input type="email" name="construction_mgmt_doc_company_email" id="construction_mgmt_doc_company_email" value="<?php echo esc_attr((string) get_option('construction_mgmt_doc_company_email', '')); ?>" class="regular-text" /></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="construction_mgmt_doc_company_kra_pin">Company KRA PIN</label></th>
+                    <td><input type="text" name="construction_mgmt_doc_company_kra_pin" id="construction_mgmt_doc_company_kra_pin" value="<?php echo esc_attr((string) get_option('construction_mgmt_doc_company_kra_pin', '')); ?>" class="regular-text" placeholder="P00123456789Z" /></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="construction_mgmt_doc_logo_url">Company Logo URL</label></th>
+                    <td>
+                        <input type="url" name="construction_mgmt_doc_logo_url" id="construction_mgmt_doc_logo_url" value="<?php echo esc_attr((string) get_option('construction_mgmt_doc_logo_url', '')); ?>" class="regular-text" placeholder="https://..." />
+                        <p class="description">Image will be displayed on invoices, receipts, and quotes. Max height: 60px.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="construction_mgmt_doc_footer_text">Document Footer Text</label></th>
+                    <td><textarea name="construction_mgmt_doc_footer_text" id="construction_mgmt_doc_footer_text" class="large-text" rows="3"><?php echo esc_textarea((string) get_option('construction_mgmt_doc_footer_text', '')); ?></textarea></td>
                 </tr>
             </table>
 

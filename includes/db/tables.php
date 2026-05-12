@@ -480,6 +480,74 @@ function construction_mgmt_get_required_table_sql() {
                 FOREIGN KEY (invoice_id) REFERENCES {$table_prefix}invoices(id) ON DELETE CASCADE
             ) {$charset_collate};",
         ],
+        'receipts' => [
+            'label' => 'Receipts',
+            'table_name' => $table_prefix . 'receipts',
+            'required_columns' => [
+                'id', 'payment_id', 'receipt_number', 'receipt_date', 'client_name', 'amount', 'payment_method', 'status', 'created_at', 'updated_at',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}receipts (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                payment_id BIGINT UNSIGNED,
+                receipt_number VARCHAR(100) NOT NULL,
+                receipt_date DATE,
+                client_name VARCHAR(255),
+                amount DECIMAL(12,2) DEFAULT 0.00,
+                payment_method VARCHAR(50),
+                status ENUM('draft','issued','cancelled') DEFAULT 'draft',
+                notes LONGTEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY receipt_number (receipt_number),
+                KEY payment_id (payment_id),
+                KEY receipt_date (receipt_date)
+            ) {$charset_collate};",
+        ],
+        'quotes' => [
+            'label' => 'Quotes',
+            'table_name' => $table_prefix . 'quotes',
+            'required_columns' => [
+                'id', 'project_id', 'quote_number', 'quote_date', 'client_name', 'valid_until', 'status', 'subtotal', 'tax_total', 'grand_total', 'created_at', 'updated_at',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}quotes (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                project_id BIGINT UNSIGNED,
+                quote_number VARCHAR(100) NOT NULL,
+                quote_date DATE,
+                client_name VARCHAR(255),
+                valid_until DATE,
+                status ENUM('draft','issued','accepted','rejected','expired') DEFAULT 'draft',
+                subtotal DECIMAL(12,2) DEFAULT 0.00,
+                tax_total DECIMAL(12,2) DEFAULT 0.00,
+                grand_total DECIMAL(12,2) DEFAULT 0.00,
+                notes LONGTEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY quote_number (quote_number),
+                KEY project_id (project_id),
+                KEY valid_until (valid_until)
+            ) {$charset_collate};",
+        ],
+        'quote_items' => [
+            'label' => 'Quote Items',
+            'table_name' => $table_prefix . 'quote_items',
+            'required_columns' => [
+                'id', 'quote_id', 'description', 'quantity', 'unit_price', 'vat_amount', 'tax_amount', 'line_total', 'created_at',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}quote_items (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                quote_id BIGINT UNSIGNED NOT NULL,
+                description TEXT NOT NULL,
+                quantity DECIMAL(12,2) DEFAULT 1.00,
+                unit_price DECIMAL(12,2) DEFAULT 0.00,
+                vat_amount DECIMAL(12,2) DEFAULT 0.00,
+                tax_amount DECIMAL(12,2) DEFAULT 0.00,
+                line_total DECIMAL(12,2) DEFAULT 0.00,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                KEY quote_id (quote_id),
+                FOREIGN KEY (quote_id) REFERENCES {$table_prefix}quotes(id) ON DELETE CASCADE
+            ) {$charset_collate};",
+        ],
         'suppliers' => [
             'label' => 'Suppliers',
             'table_name' => $table_prefix . 'suppliers',
@@ -931,6 +999,9 @@ function construction_mgmt_get_target_table_blueprint() {
 
         ['module' => 'Invoicing & Billing', 'suffix' => 'invoices', 'label' => 'Invoices'],
         ['module' => 'Invoicing & Billing', 'suffix' => 'invoice_items', 'label' => 'Invoice Items'],
+        ['module' => 'Invoicing & Billing', 'suffix' => 'receipts', 'label' => 'Receipts'],
+        ['module' => 'Invoicing & Billing', 'suffix' => 'quotes', 'label' => 'Quotes'],
+        ['module' => 'Invoicing & Billing', 'suffix' => 'quote_items', 'label' => 'Quote Items'],
         ['module' => 'Invoicing & Billing', 'suffix' => 'credit_notes', 'label' => 'Credit Notes'],
         ['module' => 'Invoicing & Billing', 'suffix' => 'recurring_invoice_profiles', 'label' => 'Recurring Invoice Profiles'],
 
@@ -989,6 +1060,9 @@ function construction_mgmt_get_table_harmonization_report() {
         'payments' => 'payments',
         'invoices' => 'invoices',
         'invoice_items' => 'invoice_items',
+        'receipts' => 'receipts',
+        'quotes' => 'quotes',
+        'quote_items' => 'quote_items',
         'suppliers' => 'suppliers',
         'purchase_requisitions' => 'purchase_requisitions',
         'purchase_orders' => 'purchase_orders',

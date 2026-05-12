@@ -21,6 +21,7 @@ require_once CONSTRUCTION_MGMT_PATH . 'includes/admin/roles-manager.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/admin/db-tools.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/admin/create-project.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/admin/project-management.php';
+require_once CONSTRUCTION_MGMT_PATH . 'includes/admin/documents.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/db/tables.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/db/projects.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/db/project_create.php';
@@ -42,6 +43,7 @@ require_once CONSTRUCTION_MGMT_PATH . 'includes/security/validation.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/security/logging.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/security/github-memory.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/integrations/mpesa.php';
+require_once CONSTRUCTION_MGMT_PATH . 'includes/documents/document-service.php';
 
 // Activation / deactivation hooks
 register_activation_hook(__FILE__, 'construction_mgmt_activate');

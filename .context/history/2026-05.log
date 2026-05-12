@@ -4,3 +4,7 @@
 {"event": "link-commit", "entry_id": "ctx-20260511-093911403321-9de7ef66", "commit": "HEAD", "timestamp": "2026-05-11T09:39:11Z"}
 {"event": "record", "entry_id": "ctx-20260512-150504968616-bb8e95b0", "category": "decision", "title": "JINSING platform blueprint and target role model", "timestamp": "2026-05-12T15:05:04Z"}
 {"event": "link-commit", "entry_id": "ctx-20260512-150504968616-bb8e95b0", "commit": "42ff8a6", "timestamp": "2026-05-12T15:05:05Z"}
+{"event": "record", "entry_id": "ctx-20260512-154127694110-c4af7883", "category": "feature", "title": "M-Pesa Daraja STK push and webhook payment synchronization", "timestamp": "2026-05-12T15:41:27Z"}
+{"event": "link-commit", "entry_id": "ctx-20260512-154127694110-c4af7883", "commit": "344a5a8", "timestamp": "2026-05-12T15:41:36Z"}
+{"event": "record", "entry_id": "ctx-20260512-155556222602-428a2994", "category": "feature", "title": "Document generation system with Dompdf", "timestamp": "2026-05-12T15:55:56Z"}
+{"event": "link-commit", "entry_id": "ctx-20260512-155556222602-428a2994", "commit": "344a5a8", "timestamp": "2026-05-12T15:56:03Z"}
