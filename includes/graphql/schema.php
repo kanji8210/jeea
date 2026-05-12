@@ -158,6 +158,11 @@ add_action('graphql_register_types', function() {
             'canCreateProjects' => ['type' => 'Boolean'],
             'canManageConstructionProjects' => ['type' => 'Boolean'],
             'canManageOptions' => ['type' => 'Boolean'],
+            'authHeaderPresent' => ['type' => 'Boolean'],
+            'tokenPresent' => ['type' => 'Boolean'],
+            'tokenAlg' => ['type' => 'String'],
+            'secretSource' => ['type' => 'String'],
+            'authError' => ['type' => 'String'],
         ],
     ]);
 
@@ -186,6 +191,9 @@ add_action('graphql_register_types', function() {
             $user = wp_get_current_user();
             $user_id = get_current_user_id();
             $is_authenticated = $user_id > 0 && $user && $user->exists();
+            $jwt_debug = function_exists('construction_mgmt_get_graphql_auth_debug')
+                ? construction_mgmt_get_graphql_auth_debug()
+                : [];
 
             return [
                 'isAuthenticated' => $is_authenticated,
@@ -196,6 +204,11 @@ add_action('graphql_register_types', function() {
                 'canCreateProjects' => current_user_can('create_projects'),
                 'canManageConstructionProjects' => current_user_can('manage_construction_projects'),
                 'canManageOptions' => current_user_can('manage_options'),
+                'authHeaderPresent' => !empty($jwt_debug['header_present']),
+                'tokenPresent' => !empty($jwt_debug['token_present']),
+                'tokenAlg' => isset($jwt_debug['token_alg']) ? (string) $jwt_debug['token_alg'] : '',
+                'secretSource' => isset($jwt_debug['secret_source']) ? (string) $jwt_debug['secret_source'] : '',
+                'authError' => isset($jwt_debug['error']) ? (string) $jwt_debug['error'] : '',
             ];
         },
     ]);
