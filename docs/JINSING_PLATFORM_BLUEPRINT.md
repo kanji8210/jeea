@@ -324,7 +324,7 @@ variance per code: Budget / Spent / Remaining.
 
 | Method | Description |
 |---|---|
-| Receipt OCR | Upload photo or PDF; extract vendor, amount, date, VAT using Google Vision or Tesseract.js; frontend upload via `uploadReceipt` mutation (see AUTO_ENTRIES.md) |
+| Receipt OCR | Upload photo or PDF; extract vendor, amount, date, VAT using Google Vision or Tesseract.js; frontend upload via `uploadReceipt` mutation (see AUTO_ENTRIES.md); includes camera capture button that opens the device camera directly on mobile (`capture="environment"`) |
 | Bank / M-Pesa Import | Connect to bank or M-Pesa API, or upload CSV; auto-match transactions to cost codes |
 | Voice Expense (future) | "Bought 5 bags of cement at 700 KES" parsed by NLP to create an expense record |
 

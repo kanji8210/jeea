@@ -49,6 +49,7 @@ require_once CONSTRUCTION_MGMT_PATH . 'includes/documents/document-service.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/api/register.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/api/docs.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/api/auto-entries.php';
+require_once CONSTRUCTION_MGMT_PATH . 'includes/public/project-cpt.php';
 
 // Activation / deactivation hooks
 register_activation_hook(__FILE__, 'construction_mgmt_activate');
@@ -57,6 +58,7 @@ register_deactivation_hook(__FILE__, 'construction_mgmt_deactivate');
 function construction_mgmt_activate() {
     construction_mgmt_create_tables();
     construction_mgmt_register_roles();
+    jinsing_cpt_flush_rewrite();
 
     // Set default options
     add_option('construction_mgmt_rate_limit', 100);

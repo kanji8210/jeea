@@ -11,9 +11,22 @@ function construction_mgmt_project_list_page() {
     $projects = $wpdb->get_results("SELECT * FROM $projects_table ORDER BY updated_at DESC");
 
     $project_stats_map = [];
+    $project_public_url_map = [];
     if (!empty($projects)) {
         foreach ($projects as $project_row) {
-            $project_stats_map[(int) $project_row->id] = construction_mgmt_get_project_financial_stats((int) $project_row->id);
+            $pid = (int) $project_row->id;
+            $project_stats_map[$pid] = construction_mgmt_get_project_financial_stats($pid);
+
+            // Find linked CPT post for public view URL
+            $cpt_posts = get_posts( [
+                'post_type'      => 'jinsing_project',
+                'posts_per_page' => 1,
+                'post_status'    => 'publish',
+                'meta_key'       => '_jinsing_project_id',
+                'meta_value'     => $pid,
+                'fields'         => 'ids',
+            ] );
+            $project_public_url_map[$pid] = ! empty( $cpt_posts ) ? get_permalink( $cpt_posts[0] ) : '';
         }
     }
     
@@ -54,7 +67,14 @@ function construction_mgmt_project_list_page() {
                             <td><?php echo esc_html($project->start_date); ?></td>
                             <td><?php echo esc_html($project->end_date ?? '--'); ?></td>
                             <td>
-                                <a href="<?php echo esc_url(admin_url('admin.php?page=construction-mgmt-project-management&id=' . $project->id)); ?>" class="button">Manage</a>
+                                <a href="<?php echo esc_url(admin_url('admin.php?page=construction-mgmt-project-management&id=' . $project->id)); ?>" class="button button-primary" style="margin-right:4px;">Manage Project</a>
+                                <?php
+                                $pub_url = $project_public_url_map[(int) $project->id] ?? '';
+                                if ( $pub_url ) : ?>
+                                <a href="<?php echo esc_url($pub_url); ?>" class="button" target="_blank" rel="noopener">View Project ↗</a>
+                                <?php else : ?>
+                                <span class="button disabled" title="No published CPT post linked yet" style="opacity:.5;cursor:default;">View Project</span>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -138,6 +158,17 @@ function construction_mgmt_project_management_page() {
     $remaining_budget = (float) $project->budget_total - $total_expenditure;
     $utilization_percent = (float) $project->budget_total > 0 ? round(($total_expenditure / (float) $project->budget_total) * 100, 1) : 0.0;
 
+    // Resolve public CPT URL for this project
+    $cpt_pub_posts = get_posts( [
+        'post_type'      => 'jinsing_project',
+        'posts_per_page' => 1,
+        'post_status'    => 'publish',
+        'meta_key'       => '_jinsing_project_id',
+        'meta_value'     => $project_id,
+        'fields'         => 'ids',
+    ] );
+    $cpt_pub_url = ! empty( $cpt_pub_posts ) ? get_permalink( $cpt_pub_posts[0] ) : '';
+
     ?>
     <div class="wrap">
         <h1><?php echo esc_html($project->name); ?></h1>
@@ -145,6 +176,10 @@ function construction_mgmt_project_management_page() {
             <strong>Project ID:</strong> #<?php echo esc_html($project->id); ?> | 
             <strong>Status:</strong> <?php echo esc_html(ucwords(str_replace('_', ' ', $project->status))); ?> |
             <a href="<?php echo esc_url(admin_url('admin.php?page=construction-mgmt-project-management')); ?>">← Back to Projects</a>
+            <?php if ( $cpt_pub_url ) : ?>
+            &nbsp;&nbsp;
+            <a href="<?php echo esc_url( $cpt_pub_url ); ?>" target="_blank" rel="noopener" class="button button-secondary" style="text-decoration:none;">View Public Page ↗</a>
+            <?php endif; ?>
         </p>
 
         <?php if (!empty($message)) : ?>
