@@ -31,6 +31,8 @@ require_once CONSTRUCTION_MGMT_PATH . 'includes/db/project_team.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/db/project_documents.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/db/project_objectives.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/db/project_expenditures.php';
+require_once CONSTRUCTION_MGMT_PATH . 'includes/db/suppliers.php';
+require_once CONSTRUCTION_MGMT_PATH . 'includes/db/workers.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/db/quote_requests.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/db/rfis.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/db/costs.php';
@@ -44,6 +46,9 @@ require_once CONSTRUCTION_MGMT_PATH . 'includes/security/logging.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/security/github-memory.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/integrations/mpesa.php';
 require_once CONSTRUCTION_MGMT_PATH . 'includes/documents/document-service.php';
+require_once CONSTRUCTION_MGMT_PATH . 'includes/api/register.php';
+require_once CONSTRUCTION_MGMT_PATH . 'includes/api/docs.php';
+require_once CONSTRUCTION_MGMT_PATH . 'includes/api/auto-entries.php';
 
 // Activation / deactivation hooks
 register_activation_hook(__FILE__, 'construction_mgmt_activate');

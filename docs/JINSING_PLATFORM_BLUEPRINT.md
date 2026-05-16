@@ -123,9 +123,9 @@ This group should be split in implementation even if grouped functionally in pro
 - Subcontractor: scoped access to assigned project packages, RFIs, submittals, claims
 - Supplier: scoped access to procurement, purchase orders, delivery notes, invoices
 
-## Kenya-Specific Supporting Role
+## Kenya-Specific Supporting Roles
 
-JINSING should reserve a future role for Kenya compliance operations.
+JINSING should reserve future roles for Kenya compliance and local procurement operations.
 
 ### Kenya Compliance Officer
 
@@ -137,6 +137,35 @@ Scope:
 - contractor-category validation against project size or classification
 
 This can initially be implemented as a capability bundle assigned to System Administrator or Finance Officer until a dedicated role is needed.
+
+### Material Supplier (Kenya Context)
+
+In the Kenyan construction market, bulk material suppliers (e.g., a ready-mix concrete supplier)
+have coordination needs that differ from general suppliers. A dedicated role can streamline
+procurement by allowing them to view relevant production or delivery schedules to better
+coordinate large or time-sensitive deliveries.
+
+Scope:
+- view assigned purchase orders and delivery schedules
+- confirm delivery quantities and dates
+- no access to project budgets, team data, or internal documents
+
+### Public / Observer
+
+A sign-off or public-facing role for clients, auditors, or regulatory bodies such as the NCA
+who need view-only access to a final, signed-off package of project documents.
+
+Scope:
+- read-only access to approved document packages
+- no access to live project data, financials, or team records
+- typically scoped to a single deliverable package, not a whole project
+
+### Collaborative Access Notes
+
+For collaborative workflows such as RFIs and submittals, roles like Subcontractor and
+External Consultant may need "Consulted" or "Informed" access granted on a per-project basis
+rather than as a global capability. The permission model should support project-scoped
+access tiers beyond simple read/write.
 
 ## Current Implementation vs Target
 
@@ -155,6 +184,8 @@ This is a valid starting point, but it is not yet enough for the target platform
 - client owner portal role
 - subcontractor
 - supplier
+- material supplier (Kenya context)
+- public / observer (NCA and regulatory sign-off)
 
 ## Permission Design Standard
 
@@ -201,11 +232,40 @@ Minimum outputs:
 ### 2. Document Management / CDE
 
 Purpose:
-- single source of truth for project documentation
+- single source of truth for all project documentation from conception through handover
 
-Minimum features:
+#### Conception Documents
+
+Pre-construction and design-phase documents are stored as a dedicated document class,
+linked to the project record. Each document can carry an external URL (e.g., a hosted
+render, a Google Drive plan, a county permit portal link) alongside or instead of a
+locally uploaded file.
+
+| Document Type | Description |
+|---|---|
+| Architectural Renders | 3D or 2D visualisations of the completed project; stored as images or linked to an external render service |
+| Approved Plans | Stamped architectural and structural drawings approved by the relevant authority |
+| Building Permits | County government or NCA permit documents with permit number, issue date, and expiry date |
+| Environmental Impact Assessment (EIA) | NEMA approval documents where required |
+| Structural Reports | Soil test reports, structural calculations, geotechnical surveys |
+| Survey / Title Documents | Land survey plans, title deed scans, mutation documents |
+| Client Brief | Scope of work, project brief, or feasibility study agreed with the client |
+
+Each conception document record stores:
+- `document_type` (from the list above)
+- `title` and `description`
+- `file_id` (WordPress attachment ID, optional)
+- `external_url` (link to render, permit portal, or cloud storage, optional)
+- `reference_number` (permit number, drawing number, etc.)
+- `issue_date` and `expiry_date`
+- `issued_by` (authority or firm name)
+- `project_id`
+- `uploaded_by` and `created_at`
+
+#### General Document Features
+
 - version history
-- document categories
+- document categories (conception, design, construction, handover, legal, financial)
 - project-linked storage
 - approval workflow
 - audit trail
@@ -216,14 +276,26 @@ Minimum features:
 Purpose:
 - formal communication and material/design approval workflow
 
-Minimum workflow:
-- draft
-- submitted
-- under review
-- answered or approved
-- closed or rejected
+#### RFI Workflow
 
-Required linkage:
+Status lifecycle: `draft` -> `submitted` -> `answered` -> `closed` (or `rejected`)
+
+| Feature | Description |
+|---|---|
+| Create RFI | Question text, file attachments, urgency level, due date; assigned to architect or engineer |
+| RFI Response | Answer with supporting documents; auto-notifies creator; if answer implies cost or time impact, system suggests creating a change order |
+| Change Order Link | "Create Change Order" button on any answered RFI, pre-filled with description and cost estimate |
+| Email Notifications | Instant email and in-app notification to the assigned person via WordPress email system |
+
+#### Submittal Log
+
+Status lifecycle: `draft` -> `submitted` -> `under review` -> `approved` (or `rejected`)
+
+Tracks material submittals and shop drawing approvals. Each submittal records the
+responsible submitter, reviewer, revision number, and approval date.
+
+#### Required Linkage (both RFIs and Submittals)
+
 - project
 - drawing or document reference
 - responsible party
@@ -234,20 +306,48 @@ Required linkage:
 ### 4. Cost & Financial Management
 
 Purpose:
-- control project and organization spending
+- control project and organization spending across the full financial lifecycle
 
-Minimum features:
-- budget vs actual
-- project-linked costs
-- overall company overhead costs
-- change orders
-- invoice and payment tracking
-- cost categories and cost codes
+#### Budget Setup
 
-Ledger standard:
+Budgets are defined per project using cost codes (e.g., materials, labour, equipment,
+subcontractors). Can be created by uploading an Excel/CSV file or entered manually.
+Stored in `jinsing_budget_items`.
+
+#### Real-Time Cost Tracking
+
+Every expense -- whether entered manually, created via OCR, or imported from a bank/M-Pesa
+feed -- automatically deducts from the relevant cost code. The React dashboard shows live
+variance per code: Budget / Spent / Remaining.
+
+#### Automatic Expense Entry
+
+| Method | Description |
+|---|---|
+| Receipt OCR | Upload photo or PDF; extract vendor, amount, date, VAT using Google Vision or Tesseract.js; frontend upload via `uploadReceipt` mutation (see AUTO_ENTRIES.md) |
+| Bank / M-Pesa Import | Connect to bank or M-Pesa API, or upload CSV; auto-match transactions to cost codes |
+| Voice Expense (future) | "Bought 5 bags of cement at 700 KES" parsed by NLP to create an expense record |
+
+#### Expense Categorisation
+
+AI suggests a cost code based on vendor name and item description. User confirms or
+corrects the suggestion. The model improves over time from confirmed corrections.
+Current keyword rules are in `Jinsing_AutoEntryEngine::categorize_expense()`.
+
+#### Full Feature Set
+
+| Feature | Description |
+|---|---|
+| Change Order Management | Change order linked to an RFI; tracks added cost; approval workflow (PM -> client); updates budget automatically; stored in `jinsing_change_orders` |
+| Retention Tracking | Monitor retention amount (e.g., 5% of each invoice); shows retention released vs held; automatically generates retention invoice when release conditions are met |
+| Payment Tracking | Record payments received from client and payments made to suppliers/subcontractors; linked to invoices and purchase orders |
+| Multi-Currency | Support KES, USD, UGX, and others; exchange rates updated daily via API (e.g., Central Bank of Kenya) |
+
+#### Ledger Standard
+
 - every financial record may link to a project
 - if no project is linked, classify as company overhead
-- every record should have category, type, date, amount, approval status, and source
+- every record must have: category, type, date, amount, approval status, and source
 
 ### 5. Schedule & Work Planning
 
@@ -260,6 +360,104 @@ Minimum features:
 - critical task visibility
 - responsibility assignment
 - delay reason tracking
+
+### 6. Invoicing & Billing
+
+Purpose:
+- manage the full client billing cycle from invoice generation through payment collection and tax reporting
+
+#### Invoice Generation
+
+Invoices can be created from four sources:
+
+| Method | Description |
+|---|---|
+| Progress billing | Percentage of completion derived from milestones or daily logs |
+| Milestone billing | Fixed amount triggered automatically on milestone completion |
+| Time & materials | Aggregated from approved timesheets and material issue records |
+| Manual | Custom line items entered directly |
+
+#### KRA-Compliant Invoice Templates
+
+Templates include KRA PIN, VAT breakdown (16%), withholding tax where applicable, TIN,
+and ETR-like sequential invoice numbering. PDFs generated via `react-pdf` and stored in
+the WordPress media library.
+
+#### Full Feature Set
+
+| Feature | Description |
+|---|---|
+| Invoice Approvals | Workflow: creator -> PM -> finance -> client; every approval recorded in audit log |
+| Send Invoices | Email PDF to client via `wp_mail` or SMTP; optional open-rate tracking |
+| Payment Integration | "Pay Now" button linked to M-Pesa (Lipa Na M-Pesa / Pesapal) or direct bank; status updates automatically on payment confirmation |
+| Invoice Status Dashboard | Views for draft, sent, viewed, paid, overdue, and partially paid; filterable by client, project, and date range |
+| Credit Notes | Issue credit note against an invoice, adjust amount, maintain full audit trail |
+| Recurring Invoices | Automatic generation and sending on schedule for retainer contracts or equipment rental |
+| VAT / Tax Reports | Periodic VAT summary and withholding tax summary for KRA; export in iTax format (CSV/XML) for direct upload |
+
+### 4. Procurement & Inventory Management
+
+Purpose:
+- control the full material supply chain from requisition to goods receipt and stock tracking
+
+#### Procurement Workflow
+
+Status lifecycle: `draft` -> `pending_approval` -> `approved` -> `po_sent` -> `partially_fulfilled` -> `closed`
+
+| Feature | Description |
+|---|---|
+| Vendor/Supplier Registry | Centralised database of suppliers with contact details, KRA PIN, payment terms, and performance score |
+| Purchase Requisition | Site staff creates a requisition (item, quantity, required date); approval workflow from foreman to procurement |
+| Purchase Order | Auto-generated from an approved requisition; PDF sent to vendor; PO status tracked as sent, accepted, partially fulfilled, or closed |
+| Goods Receipt Note (GRN) | Mobile-friendly GRN with camera capture of delivered goods; compared against PO; automatically updates inventory on confirmation |
+| Supplier Invoice Matching | OCR supplier invoice and compare against PO and GRN; flag discrepancies in quantity or price |
+| Material Price Tracking | Manually entered or scraped from Kenyan suppliers (e.g., Tononoka, Jumbo) to show market trends; AI predicts future price movement |
+
+#### Inventory Management
+
+Each storage location (godown or site store) is tracked independently. A company may
+operate multiple stores across different sites; stock levels, movements, and alerts are
+maintained per location rather than pooled.
+
+The Jinsing admin (System Administrator / Company Executive) has a cross-location
+aggregate view showing total stock across all stores, flagged shortages, and pending
+transfer requests without being locked to a single location.
+
+| Feature | Description |
+|---|---|
+| Location Registry | Named storage locations (e.g., "Nairobi Main Godown", "Mombasa Site Store"); linked to project or company |
+| Stock Levels | Track current quantity of each material (cement, steel, fuel, etc.) per location |
+| Stock Movements | Every GRN increases stock; every site issuance or transfer decreases it; full movement history |
+| Low Stock Alerts | Configurable minimum thresholds per material per location; notifications to procurement officer |
+| Inter-store Transfers | Record material transfers between locations with approval and audit trail |
+| Admin Aggregate View | Cross-location dashboard: total stock per material, combined shortages, and transfer activity across all stores |
+
+### 5. Resource Management
+
+Purpose:
+- manage the human and equipment resources deployed across projects
+
+#### Labour & Workers
+
+| Feature | Description |
+|---|---|
+| Worker Database | Worker details: national ID, NSSF number, NHIF number, skills, daily rate, contact (see `jinsing_workers` table) |
+| Daily Timesheets | Mobile or web form: worker check-in/out, task, hours worked, approved by site supervisor; stored in `jinsing_timesheets` |
+| Payroll Integration | Export timesheets to payroll system or built-in wage calculator; supports casual and permanent workers |
+
+#### Equipment
+
+| Feature | Description |
+|---|---|
+| Equipment Registry | Owned and leased equipment (excavators, mixers, trucks); tracks usage hours, maintenance schedule, fuel consumption |
+| Equipment Booking | Site requests equipment for specific dates; approval triggers automatic conflict check across all active bookings |
+
+#### Subcontractors
+
+| Feature | Description |
+|---|---|
+| Subcontractor Management | Contract details, scope of work, payment schedule, and performance evaluation |
+| Compliance Documents | Store and track certificates: NCA registration, insurance, and other required accreditations |
 
 ### 6. Mobile Field Operations
 
@@ -311,6 +509,30 @@ Minimum features:
 - issue linkage to model elements
 - future 4D/5D integration
 
+### Reporting & Analytics
+
+| Feature | Description |
+|---|---|
+| Custom Dashboard | Drag-and-drop widgets: budget pie chart, upcoming milestones, open punch list counts, cash flow forecast |
+| Financial Reports | Profit and loss by project, ageing accounts receivable, VAT summary, retention schedule; export to Excel and PDF |
+| Productivity Report | Labour hours vs planned, equipment utilisation, material consumption rate |
+| NCA Compliance Report | One-click report listing all projects with NCA registration, licence status, and inspection history |
+| Export to iTax | Generate XML/CSV for VAT returns and withholding tax |
+| AI-Generated Narrative | Monthly progress report written by GPT: "Project X is 45% complete, 10% behind schedule due to rain delays. Budget overspend of 3% mainly in steel." |
+
+### AI & Automation
+
+| Feature | Description |
+|---|---|
+| OCR Expense Entry | Upload receipt, extract amount/date/vendor/VAT; user confirms or corrects, then creates expense record (see AUTO_ENTRIES.md) |
+| Cost Overrun Prediction | Model analyses current spend, progress, and historical data; shows probability of exceeding budget as Risk: High / Medium / Low |
+| Schedule Delay Forecast | Predicts days behind schedule using weather data, material delays, and labour productivity trends |
+| Anomaly Detection | Flags unusual expense spikes (e.g., 3x normal cement cost) and notifies the project manager |
+| Auto-Categorisation | New vendor entry triggers cost-code suggestion based on vendor name and item description |
+| Intelligent Change Orders | When an RFI answer contains "additional cost" or "extra work", auto-populates a change order draft |
+| Material Price Forecast | Predicts cement and steel price movement over the next 3 months using historical local data |
+| Voice Expense Assistant | Field user says "Bought 5 bags of cement for 3,500 bob" and the system creates an expense record automatically |
+
 ## Core Data Domains
 
 JINSING should be organized around these main entities.
@@ -338,6 +560,7 @@ JINSING should be organized around these main entities.
 
 - documents
 - document versions
+- conception documents (renders, permits, approved plans, EIA, structural reports, survey/title, client brief)
 - transmittals
 - approvals
 - comments
@@ -511,6 +734,16 @@ The next concrete build slice should be:
 - finance officer entry and approval screen
 - project manager project-cost view
 - executive read-only portfolio finance summary
+
+## Module Documentation
+
+Detailed implementation docs for individual modules are kept alongside this blueprint.
+
+| Module | Document |
+|---|---|
+| Automated Entries (expenses, OCR, timesheets, workers, suppliers) | [AUTO_ENTRIES.md](AUTO_ENTRIES.md) |
+
+---
 
 ## Working Rule
 

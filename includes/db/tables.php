@@ -695,7 +695,7 @@ function construction_mgmt_get_required_table_sql() {
             'label' => 'Workers',
             'table_name' => $table_prefix . 'workers',
             'required_columns' => [
-                'id', 'full_name', 'national_id', 'nssf_number', 'nhif_number', 'skill_type', 'daily_rate', 'is_active', 'created_at', 'updated_at',
+                'id', 'full_name', 'national_id', 'nssf_number', 'nhif_number', 'skill_type', 'daily_rate', 'phone', 'is_active', 'created_at', 'updated_at',
             ],
             'sql' => "CREATE TABLE {$table_prefix}workers (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -973,6 +973,160 @@ function construction_mgmt_get_required_table_sql() {
                 INDEX (user_id, operation_name)
             ) {$charset_collate};",
         ],
+        'expenses' => [
+            'label' => 'Expenses',
+            'table_name' => $table_prefix . 'expenses',
+            'legacy_table_name' => $legacy_table_prefix . 'project_expenditures',
+            'required_columns' => [
+                'id', 'project_id', 'vendor', 'amount', 'vat', 'date', 'cost_code',
+                'description', 'source', 'source_id', 'created_by', 'created_at',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}expenses (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                project_id BIGINT UNSIGNED,
+                vendor VARCHAR(255),
+                amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+                vat DECIMAL(12,2) DEFAULT 0.00,
+                date DATE,
+                cost_code VARCHAR(100),
+                description TEXT,
+                source ENUM('manual','ocr','timesheet_auto','mpesa','api') DEFAULT 'manual',
+                source_id BIGINT UNSIGNED,
+                created_by BIGINT UNSIGNED,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                KEY project_id (project_id),
+                KEY cost_code (cost_code),
+                KEY source (source),
+                KEY date (date)
+            ) {$charset_collate};",
+        ],
+        'ocr_queue' => [
+            'label' => 'OCR Queue',
+            'table_name' => $table_prefix . 'ocr_queue',
+            'required_columns' => [
+                'id', 'file_path', 'file_type', 'project_id', 'processing_status',
+                'extracted_json', 'processed_at', 'created_at',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}ocr_queue (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                file_path VARCHAR(500) NOT NULL,
+                file_type ENUM('receipt','invoice','po','other') DEFAULT 'receipt',
+                project_id BIGINT UNSIGNED,
+                processing_status ENUM('queued','processing','completed','failed') DEFAULT 'queued',
+                extracted_json LONGTEXT,
+                error_message TEXT,
+                queued_by BIGINT UNSIGNED,
+                processed_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                KEY processing_status (processing_status),
+                KEY project_id (project_id)
+            ) {$charset_collate};",
+        ],
+        'auto_entry_logs' => [
+            'label' => 'Auto Entry Logs',
+            'table_name' => $table_prefix . 'auto_entry_logs',
+            'required_columns' => [
+                'id', 'source_type', 'source_id', 'created_entity_type',
+                'created_entity_id', 'extracted_data', 'confidence_score', 'status', 'created_at',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}auto_entry_logs (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                source_type ENUM('ocr','timesheet','mpesa','api') NOT NULL,
+                source_id BIGINT UNSIGNED,
+                created_entity_type VARCHAR(50),
+                created_entity_id BIGINT UNSIGNED,
+                extracted_data LONGTEXT,
+                confidence_score DECIMAL(5,4) DEFAULT 0.0000,
+                status ENUM('auto_approved','pending_review','rejected') DEFAULT 'pending_review',
+                reviewed_by BIGINT UNSIGNED,
+                reviewed_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                KEY source_type (source_type),
+                KEY status (status),
+                KEY created_entity_type (created_entity_type)
+            ) {$charset_collate};",
+        ],
+        'docs_articles' => [
+            'label' => 'Docs Articles',
+            'table_name' => $table_prefix . 'docs_articles',
+            'required_columns' => [
+                'id', 'title', 'slug', 'content', 'excerpt', 'doc_type', 'category',
+                'tags', 'author_id', 'version', 'status', 'view_count', 'helpful_count',
+                'not_helpful_count', 'created_at', 'updated_at', 'published_at',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}docs_articles (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                title VARCHAR(255) NOT NULL,
+                slug VARCHAR(255) NOT NULL,
+                content LONGTEXT NOT NULL,
+                excerpt TEXT,
+                doc_type ENUM('guide','api','tutorial','faq','changelog') DEFAULT 'guide',
+                category VARCHAR(100),
+                tags LONGTEXT,
+                author_id BIGINT UNSIGNED,
+                version VARCHAR(20) DEFAULT '1.0',
+                status ENUM('draft','published','archived') DEFAULT 'draft',
+                view_count INT DEFAULT 0,
+                helpful_count INT DEFAULT 0,
+                not_helpful_count INT DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                published_at DATETIME,
+                UNIQUE KEY slug (slug),
+                KEY doc_type (doc_type),
+                KEY status (status)
+            ) {$charset_collate};",
+        ],
+        'docs_categories' => [
+            'label' => 'Docs Categories',
+            'table_name' => $table_prefix . 'docs_categories',
+            'required_columns' => [
+                'id', 'name', 'slug', 'description', 'parent_id', 'display_order',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}docs_categories (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                slug VARCHAR(100) NOT NULL,
+                description TEXT,
+                parent_id BIGINT UNSIGNED,
+                display_order INT DEFAULT 0,
+                UNIQUE KEY slug (slug),
+                KEY parent_id (parent_id)
+            ) {$charset_collate};",
+        ],
+        'docs_access' => [
+            'label' => 'Docs Access Log',
+            'table_name' => $table_prefix . 'docs_access',
+            'required_columns' => [
+                'id', 'user_id', 'article_id', 'access_type', 'accessed_at',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}docs_access (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                user_id BIGINT UNSIGNED NOT NULL,
+                article_id BIGINT UNSIGNED NOT NULL,
+                access_type ENUM('read','download') DEFAULT 'read',
+                accessed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                KEY user_id (user_id),
+                KEY article_id (article_id)
+            ) {$charset_collate};",
+        ],
+        'docs_search' => [
+            'label' => 'Docs Search History',
+            'table_name' => $table_prefix . 'docs_search',
+            'required_columns' => [
+                'id', 'user_id', 'search_term', 'results_count', 'ip_address', 'searched_at',
+            ],
+            'sql' => "CREATE TABLE {$table_prefix}docs_search (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                user_id BIGINT UNSIGNED,
+                search_term VARCHAR(255),
+                results_count INT,
+                ip_address VARCHAR(45),
+                searched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                KEY search_term (search_term),
+                KEY user_id (user_id)
+            ) {$charset_collate};",
+        ],
     ];
 }
 
@@ -1034,6 +1188,15 @@ function construction_mgmt_get_target_table_blueprint() {
 
         ['module' => 'AI / ML Specific', 'suffix' => 'ml_predictions', 'label' => 'ML Predictions'],
         ['module' => 'AI / ML Specific', 'suffix' => 'training_data', 'label' => 'Training Data'],
+
+        ['module' => 'Automated Entries', 'suffix' => 'expenses', 'label' => 'Expenses'],
+        ['module' => 'Automated Entries', 'suffix' => 'ocr_queue', 'label' => 'OCR Queue'],
+        ['module' => 'Automated Entries', 'suffix' => 'auto_entry_logs', 'label' => 'Auto Entry Logs'],
+
+        ['module' => 'Documentation', 'suffix' => 'docs_articles', 'label' => 'Docs Articles'],
+        ['module' => 'Documentation', 'suffix' => 'docs_categories', 'label' => 'Docs Categories'],
+        ['module' => 'Documentation', 'suffix' => 'docs_access', 'label' => 'Docs Access Log'],
+        ['module' => 'Documentation', 'suffix' => 'docs_search', 'label' => 'Docs Search History'],
     ];
 }
 
@@ -1083,6 +1246,13 @@ function construction_mgmt_get_table_harmonization_report() {
         'submittals' => 'submittals',
         'mpesa_transactions' => 'mpesa_transactions',
         'audit_log' => 'audit_log',
+        'docs_articles' => 'docs_articles',
+        'docs_categories' => 'docs_categories',
+        'docs_access' => 'docs_access',
+        'docs_search' => 'docs_search',
+        'expenses' => 'expenses',
+        'ocr_queue' => 'ocr_queue',
+        'auto_entry_logs' => 'auto_entry_logs',
     ];
 
     $mapped_required_keys = [];

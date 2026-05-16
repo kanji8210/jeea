@@ -92,6 +92,124 @@ add_action('graphql_register_types', function() {
         ],
     ]);
 
+    register_graphql_object_type('Supplier', [
+        'description' => 'A supplier profile used by procurement workflows',
+        'fields' => [
+            'id' => ['type' => 'Int'],
+            'name' => ['type' => 'String'],
+            'kraPin' => [
+                'type' => 'String',
+                'resolve' => function($supplier) {
+                    return $supplier['kra_pin'] ?? null;
+                },
+            ],
+            'contactName' => [
+                'type' => 'String',
+                'resolve' => function($supplier) {
+                    return $supplier['contact_name'] ?? null;
+                },
+            ],
+            'contactEmail' => [
+                'type' => 'String',
+                'resolve' => function($supplier) {
+                    return $supplier['contact_email'] ?? null;
+                },
+            ],
+            'contactPhone' => [
+                'type' => 'String',
+                'resolve' => function($supplier) {
+                    return $supplier['contact_phone'] ?? null;
+                },
+            ],
+            'paymentTerms' => [
+                'type' => 'String',
+                'resolve' => function($supplier) {
+                    return $supplier['payment_terms'] ?? null;
+                },
+            ],
+            'notes' => ['type' => 'String'],
+            'createdAt' => [
+                'type' => 'String',
+                'resolve' => function($supplier) {
+                    return $supplier['created_at'] ?? null;
+                },
+            ],
+            'updatedAt' => [
+                'type' => 'String',
+                'resolve' => function($supplier) {
+                    return $supplier['updated_at'] ?? null;
+                },
+            ],
+        ],
+    ]);
+
+    register_graphql_object_type('Worker', [
+        'description' => 'A casual worker profile used by field operations',
+        'fields' => [
+            'id' => ['type' => 'Int'],
+            'fullName' => [
+                'type' => 'String',
+                'resolve' => function($worker) {
+                    return $worker['full_name'] ?? null;
+                },
+            ],
+            'nationalId' => [
+                'type' => 'String',
+                'resolve' => function($worker) {
+                    return $worker['national_id'] ?? null;
+                },
+            ],
+            'nssfNumber' => [
+                'type' => 'String',
+                'resolve' => function($worker) {
+                    return $worker['nssf_number'] ?? null;
+                },
+            ],
+            'nhifNumber' => [
+                'type' => 'String',
+                'resolve' => function($worker) {
+                    return $worker['nhif_number'] ?? null;
+                },
+            ],
+            'skillType' => [
+                'type' => 'String',
+                'resolve' => function($worker) {
+                    return $worker['skill_type'] ?? null;
+                },
+            ],
+            'dailyRate' => [
+                'type' => 'Float',
+                'resolve' => function($worker) {
+                    return isset($worker['daily_rate']) ? (float) $worker['daily_rate'] : 0.0;
+                },
+            ],
+            'phone' => [
+                'type' => 'String',
+                'resolve' => function($worker) {
+                    return $worker['phone'] ?? null;
+                },
+            ],
+            'isActive' => [
+                'type' => 'Boolean',
+                'resolve' => function($worker) {
+                    return !empty($worker['is_active']);
+                },
+            ],
+            'createdAt' => [
+                'type' => 'String',
+                'resolve' => function($worker) {
+                    return $worker['created_at'] ?? null;
+                },
+            ],
+            'updatedAt' => [
+                'type' => 'String',
+                'resolve' => function($worker) {
+                    return $worker['updated_at'] ?? null;
+                },
+            ],
+        ],
+    ]);
+
     // Register Project type with expanded fields
     register_graphql_object_type('ConstructionProject', [
         'description' => 'A construction project with full PMBOK governance',
@@ -222,6 +340,28 @@ add_action('graphql_register_types', function() {
         'resolve' => function($source, $args, $context, $info) {
             if (!current_user_can('read_projects')) return null;
             return construction_mgmt_get_project($args['id']);
+        }
+    ]);
+
+    register_graphql_field('RootQuery', 'suppliers', [
+        'type' => ['list_of' => 'Supplier'],
+        'resolve' => function() {
+            if (!current_user_can('read_projects') && !current_user_can('manage_construction_projects')) {
+                return [];
+            }
+
+            return construction_mgmt_get_suppliers();
+        }
+    ]);
+
+    register_graphql_field('RootQuery', 'workers', [
+        'type' => ['list_of' => 'Worker'],
+        'resolve' => function() {
+            if (!current_user_can('read_projects') && !current_user_can('manage_construction_projects')) {
+                return [];
+            }
+
+            return construction_mgmt_get_workers();
         }
     ]);
 
@@ -377,6 +517,148 @@ add_action('graphql_register_types', function() {
                 'success' => true,
                 'message' => 'Team member assigned successfully.',
             ];
+        }
+    ]);
+
+    register_graphql_field('RootMutation', 'createSupplier', [
+        'type' => 'Supplier',
+        'args' => [
+            'name' => ['type' => 'String'],
+            'kraPin' => ['type' => 'String'],
+            'contactName' => ['type' => 'String'],
+            'contactEmail' => ['type' => 'String'],
+            'contactPhone' => ['type' => 'String'],
+            'paymentTerms' => ['type' => 'String'],
+            'notes' => ['type' => 'String'],
+        ],
+        'resolve' => function($source, $args) {
+            if (!current_user_can('manage_construction_projects')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+
+            $supplier = construction_mgmt_create_supplier($args);
+            if (is_wp_error($supplier)) {
+                throw new \GraphQL\Error\UserError($supplier->get_error_message());
+            }
+
+            return $supplier;
+        }
+    ]);
+
+    register_graphql_field('RootMutation', 'updateSupplier', [
+        'type' => 'Supplier',
+        'args' => [
+            'id' => ['type' => 'ID'],
+            'name' => ['type' => 'String'],
+            'kraPin' => ['type' => 'String'],
+            'contactName' => ['type' => 'String'],
+            'contactEmail' => ['type' => 'String'],
+            'contactPhone' => ['type' => 'String'],
+            'paymentTerms' => ['type' => 'String'],
+            'notes' => ['type' => 'String'],
+        ],
+        'resolve' => function($source, $args) {
+            if (!current_user_can('manage_construction_projects')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+
+            $supplier = construction_mgmt_update_supplier($args['id'] ?? 0, $args);
+            if (is_wp_error($supplier)) {
+                throw new \GraphQL\Error\UserError($supplier->get_error_message());
+            }
+
+            return $supplier;
+        }
+    ]);
+
+    register_graphql_field('RootMutation', 'deleteSupplier', [
+        'type' => 'Boolean',
+        'args' => [
+            'id' => ['type' => 'ID'],
+        ],
+        'resolve' => function($source, $args) {
+            if (!current_user_can('manage_construction_projects')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+
+            $deleted = construction_mgmt_delete_supplier($args['id'] ?? 0);
+            if (is_wp_error($deleted)) {
+                throw new \GraphQL\Error\UserError($deleted->get_error_message());
+            }
+
+            return true;
+        }
+    ]);
+
+    register_graphql_field('RootMutation', 'createWorker', [
+        'type' => 'Worker',
+        'args' => [
+            'fullName' => ['type' => 'String'],
+            'nationalId' => ['type' => 'String'],
+            'nssfNumber' => ['type' => 'String'],
+            'nhifNumber' => ['type' => 'String'],
+            'skillType' => ['type' => 'String'],
+            'dailyRate' => ['type' => 'Float'],
+            'phone' => ['type' => 'String'],
+            'isActive' => ['type' => 'Boolean'],
+        ],
+        'resolve' => function($source, $args) {
+            if (!current_user_can('manage_construction_projects')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+
+            $worker = construction_mgmt_create_worker($args);
+            if (is_wp_error($worker)) {
+                throw new \GraphQL\Error\UserError($worker->get_error_message());
+            }
+
+            return $worker;
+        }
+    ]);
+
+    register_graphql_field('RootMutation', 'updateWorker', [
+        'type' => 'Worker',
+        'args' => [
+            'id' => ['type' => 'ID'],
+            'fullName' => ['type' => 'String'],
+            'nationalId' => ['type' => 'String'],
+            'nssfNumber' => ['type' => 'String'],
+            'nhifNumber' => ['type' => 'String'],
+            'skillType' => ['type' => 'String'],
+            'dailyRate' => ['type' => 'Float'],
+            'phone' => ['type' => 'String'],
+            'isActive' => ['type' => 'Boolean'],
+        ],
+        'resolve' => function($source, $args) {
+            if (!current_user_can('manage_construction_projects')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+
+            $worker = construction_mgmt_update_worker($args['id'] ?? 0, $args);
+            if (is_wp_error($worker)) {
+                throw new \GraphQL\Error\UserError($worker->get_error_message());
+            }
+
+            return $worker;
+        }
+    ]);
+
+    register_graphql_field('RootMutation', 'deleteWorker', [
+        'type' => 'Boolean',
+        'args' => [
+            'id' => ['type' => 'ID'],
+        ],
+        'resolve' => function($source, $args) {
+            if (!current_user_can('manage_construction_projects')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+
+            $deleted = construction_mgmt_delete_worker($args['id'] ?? 0);
+            if (is_wp_error($deleted)) {
+                throw new \GraphQL\Error\UserError($deleted->get_error_message());
+            }
+
+            return true;
         }
     ]);
 });

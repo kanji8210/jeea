@@ -52,7 +52,7 @@ function construction_mgmt_project_list_page() {
                             <td><?php echo esc_html((string) (int) $stats['objectives_total']); ?></td>
                             <td><?php echo esc_html((string) (int) $stats['expenditures_total']); ?></td>
                             <td><?php echo esc_html($project->start_date); ?></td>
-                            <td><?php echo esc_html($project->end_date ?? '—'); ?></td>
+                            <td><?php echo esc_html($project->end_date ?? '--'); ?></td>
                             <td>
                                 <a href="<?php echo esc_url(admin_url('admin.php?page=construction-mgmt-project-management&id=' . $project->id)); ?>" class="button">Manage</a>
                             </td>
