@@ -65,6 +65,12 @@ function jinsing_register_rest_routes() {
 }
 
 function jinsing_handle_registration( WP_REST_Request $request ) {
+    return new WP_Error(
+        'jinsing_registration_disabled',
+        'Self-registration is currently disabled. Please contact the platform administrator for access.',
+        [ 'status' => 403 ]
+    );
+
     $full_name  = $request->get_param( 'fullName' );
     $email      = $request->get_param( 'email' );
     $role       = $request->get_param( 'role' );

@@ -68,6 +68,7 @@ function construction_mgmt_project_list_page() {
                             <td><?php echo esc_html($project->end_date ?? '--'); ?></td>
                             <td>
                                 <a href="<?php echo esc_url(admin_url('admin.php?page=construction-mgmt-project-management&id=' . $project->id)); ?>" class="button button-primary" style="margin-right:4px;">Manage Project</a>
+                                <a href="<?php echo esc_url(admin_url('admin.php?page=construction-mgmt-project-management&id=' . $project->id . '#site-manager-card')); ?>" class="button" style="margin-right:4px;">Site Manager</a>
                                 <?php
                                 $pub_url = $project_public_url_map[(int) $project->id] ?? '';
                                 if ( $pub_url ) : ?>
@@ -151,12 +152,78 @@ function construction_mgmt_project_management_page() {
         }
     }
 
+    // Handle assigning/changing site manager
+    if ($action === 'assign_site_manager' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!wp_verify_nonce($_POST['construction_mgmt_site_manager_nonce'] ?? '', 'construction_mgmt_assign_site_manager')) {
+            wp_die('Security check failed');
+        }
+
+        $site_manager_id = absint($_POST['site_manager_id'] ?? 0);
+        $allowed_roles = ['construction_site_manager', 'construction_site_engineer', 'construction_project_manager'];
+
+        if ($site_manager_id > 0) {
+            $site_manager_user = get_user_by('id', $site_manager_id);
+            if (!$site_manager_user) {
+                $message = 'Selected site manager was not found.';
+            } else {
+                $has_allowed_role = false;
+                foreach ((array) $site_manager_user->roles as $role_key) {
+                    if (in_array($role_key, $allowed_roles, true)) {
+                        $has_allowed_role = true;
+                        break;
+                    }
+                }
+
+                if (!$has_allowed_role && !user_can($site_manager_user, 'manage_construction_projects')) {
+                    $message = 'Selected user is not eligible for site manager assignment.';
+                } else {
+                    $existing_team = construction_mgmt_get_project_team($project_id);
+                    foreach ($existing_team as $member) {
+                        if (strtolower((string) ($member['role'] ?? '')) === 'site manager') {
+                            construction_mgmt_remove_team_member($project_id, (int) ($member['user_id'] ?? 0));
+                        }
+                    }
+
+                    $assigned = construction_mgmt_assign_team_member($project_id, $site_manager_id, 'Site Manager', 'Primary site manager');
+                    if (is_wp_error($assigned)) {
+                        $message = 'Unable to assign site manager.';
+                    } else {
+                        $message = 'Site manager assigned successfully.';
+                        $success = true;
+                    }
+                }
+            }
+        } else {
+            $existing_team = construction_mgmt_get_project_team($project_id);
+            foreach ($existing_team as $member) {
+                if (strtolower((string) ($member['role'] ?? '')) === 'site manager') {
+                    construction_mgmt_remove_team_member($project_id, (int) ($member['user_id'] ?? 0));
+                }
+            }
+            $message = 'Site manager cleared. You can assign one later.';
+            $success = true;
+        }
+    }
+
     $objectives = construction_mgmt_get_project_objectives($project_id);
     $expenditures = construction_mgmt_get_project_expenditures($project_id);
     $financial_stats = construction_mgmt_get_project_financial_stats($project_id);
     $total_expenditure = (float) $financial_stats['expenditures_amount_total'];
     $remaining_budget = (float) $project->budget_total - $total_expenditure;
     $utilization_percent = (float) $project->budget_total > 0 ? round(($total_expenditure / (float) $project->budget_total) * 100, 1) : 0.0;
+    $site_manager_candidates = get_users([
+        'fields' => ['ID', 'display_name', 'user_login', 'user_email', 'roles'],
+        'role__in' => ['construction_site_manager', 'construction_site_engineer', 'construction_project_manager'],
+        'orderby' => 'display_name',
+        'order' => 'ASC',
+    ]);
+    $current_site_manager = null;
+    foreach (construction_mgmt_get_project_team($project_id) as $member) {
+        if (strtolower((string) ($member['role'] ?? '')) === 'site manager') {
+            $current_site_manager = $member;
+            break;
+        }
+    }
 
     // Resolve public CPT URL for this project
     $cpt_pub_posts = get_posts( [
@@ -233,6 +300,34 @@ function construction_mgmt_project_management_page() {
                     <td><?php echo esc_html(number_format_i18n($remaining_budget, 2)); ?></td>
                 </tr>
             </table>
+        </div>
+
+        <div id="site-manager-card" style="background: #fff; padding: 20px; border: 1px solid #ddd; border-radius: 5px; margin: 20px 0;">
+            <h2>Site Manager</h2>
+            <p style="margin-top:0; color:#50575e;">Assign now or leave blank and add later as the project grows.</p>
+
+            <?php if ($current_site_manager) : ?>
+                <p>
+                    <strong>Current:</strong>
+                    <?php echo esc_html(($current_site_manager['display_name'] ?: $current_site_manager['user_login']) . ' (' . $current_site_manager['user_email'] . ')'); ?>
+                </p>
+            <?php else : ?>
+                <p><em>No site manager assigned yet.</em></p>
+            <?php endif; ?>
+
+            <form method="post" style="margin-top:12px;">
+                <?php wp_nonce_field('construction_mgmt_assign_site_manager', 'construction_mgmt_site_manager_nonce'); ?>
+                <input type="hidden" name="action" value="assign_site_manager" />
+                <select id="site_manager_id" name="site_manager_id" class="regular-text" style="min-width:360px;">
+                    <option value="">Assign later / clear assignment</option>
+                    <?php foreach ($site_manager_candidates as $candidate) : ?>
+                        <option value="<?php echo esc_attr($candidate->ID); ?>" <?php selected((int) ($current_site_manager['user_id'] ?? 0), (int) $candidate->ID); ?>>
+                            <?php echo esc_html(($candidate->display_name ?: $candidate->user_login) . ' (' . $candidate->user_email . ')'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php submit_button('Save Site Manager', 'secondary', 'submit', false, ['style' => 'margin-left:8px;']); ?>
+            </form>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">

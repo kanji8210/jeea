@@ -47,6 +47,17 @@ function construction_mgmt_register_roles() {
     ]);
 
     // Site engineers can work on RFIs and view project state.
+    add_role('construction_site_manager', 'Construction Site Manager', [
+        'read' => true,
+        'read_projects' => true,
+        'edit_projects' => true,
+        'read_rfis' => true,
+        'create_rfis' => true,
+        'edit_rfis' => true,
+        'manage_construction_projects' => true,
+    ]);
+
+    // Site engineers can work on RFIs and view project state.
     add_role('construction_site_engineer', 'Construction Site Engineer', [
         'read' => true,
         'read_projects' => true,
@@ -65,12 +76,12 @@ function construction_mgmt_register_roles() {
         }
     }
 
-    update_option('construction_mgmt_roles_version', '1');
+    update_option('construction_mgmt_roles_version', '2');
 }
 
 function construction_mgmt_maybe_register_roles() {
     $roles_version = get_option('construction_mgmt_roles_version', '0');
-    if ($roles_version !== '1') {
+    if ($roles_version !== '2') {
         construction_mgmt_register_roles();
     }
 }

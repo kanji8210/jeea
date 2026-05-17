@@ -39,7 +39,7 @@ function construction_mgmt_admin_menu() {
         'construction-mgmt-settings',
         'Roles Manager',
         'Roles Manager',
-        'manage_options',
+        'manage_construction_roles',
         'construction-mgmt-roles-manager',
         'construction_mgmt_roles_manager_page'
     );
@@ -69,6 +69,15 @@ function construction_mgmt_admin_menu() {
         'manage_construction_projects',
         'construction-mgmt-project-management',
         'construction_mgmt_project_management_page'
+    );
+
+    add_submenu_page(
+        'construction-mgmt-settings',
+        'Employees',
+        'Employees',
+        'manage_construction_projects',
+        'construction-mgmt-employees',
+        'construction_mgmt_employees_page'
     );
 }
 

@@ -24,6 +24,15 @@ function construction_mgmt_is_editable_construction_role($role_key) {
     return false;
 }
 
+function construction_mgmt_is_lower_assignable_role($role_key) {
+    if (!construction_mgmt_is_editable_construction_role($role_key)) {
+        return false;
+    }
+
+    // Keep platform owner role restricted from this quick-create flow.
+    return $role_key !== 'construction_director';
+}
+
 function construction_mgmt_handle_roles_manager_actions() {
     if (!current_user_can('manage_construction_roles') && !current_user_can('manage_options')) {
         return;
@@ -141,6 +150,82 @@ function construction_mgmt_handle_roles_manager_actions() {
 
         $user->add_role($target_role);
         add_settings_error('construction_mgmt_roles', 'assign_role_success', 'Construction role assigned successfully.', 'updated');
+        return;
+    }
+
+    if ($action === 'create_lower_user') {
+        $display_name = isset($_POST['new_user_display_name']) ? sanitize_text_field(wp_unslash($_POST['new_user_display_name'])) : '';
+        $email = isset($_POST['new_user_email']) ? sanitize_email(wp_unslash($_POST['new_user_email'])) : '';
+        $username = isset($_POST['new_user_username']) ? sanitize_user(wp_unslash($_POST['new_user_username']), true) : '';
+        $password_raw = isset($_POST['new_user_password']) ? (string) wp_unslash($_POST['new_user_password']) : '';
+        $target_role = isset($_POST['new_user_role']) ? sanitize_key(wp_unslash($_POST['new_user_role'])) : '';
+
+        if ($display_name === '' || $email === '' || $target_role === '') {
+            add_settings_error('construction_mgmt_roles', 'create_user_required', 'Display name, email, and role are required.', 'error');
+            return;
+        }
+
+        if (!is_email($email)) {
+            add_settings_error('construction_mgmt_roles', 'create_user_email_invalid', 'Please provide a valid email address.', 'error');
+            return;
+        }
+
+        if (!construction_mgmt_is_lower_assignable_role($target_role) || !get_role($target_role)) {
+            add_settings_error('construction_mgmt_roles', 'create_user_role_invalid', 'Selected role is not allowed.', 'error');
+            return;
+        }
+
+        if ($username === '') {
+            $username = sanitize_user(strstr($email, '@', true), true);
+        }
+
+        if ($username === '') {
+            add_settings_error('construction_mgmt_roles', 'create_user_username_invalid', 'Could not derive a valid username from the provided details.', 'error');
+            return;
+        }
+
+        if (email_exists($email)) {
+            add_settings_error('construction_mgmt_roles', 'create_user_email_exists', 'A user with this email already exists.', 'error');
+            return;
+        }
+
+        $base_username = $username;
+        $suffix = 1;
+        while (username_exists($username)) {
+            $username = $base_username . '_' . $suffix;
+            $suffix++;
+        }
+
+        $password = trim($password_raw) !== '' ? $password_raw : wp_generate_password(16, true, false);
+        $user_id = wp_create_user($username, $password, $email);
+        if (is_wp_error($user_id)) {
+            add_settings_error('construction_mgmt_roles', 'create_user_failed', 'User creation failed. Please try again.', 'error');
+            return;
+        }
+
+        wp_update_user([
+            'ID' => $user_id,
+            'display_name' => $display_name,
+            'first_name' => strstr($display_name, ' ', true) ?: $display_name,
+            'last_name' => strstr($display_name, ' ') ? ltrim((string) strstr($display_name, ' ')) : '',
+        ]);
+
+        $user = get_user_by('id', $user_id);
+        if ($user) {
+            foreach ((array) $user->roles as $existing_role) {
+                if (construction_mgmt_is_editable_construction_role($existing_role)) {
+                    $user->remove_role($existing_role);
+                }
+            }
+            $user->add_role($target_role);
+        }
+
+        add_settings_error(
+            'construction_mgmt_roles',
+            'create_user_success',
+            'User created and role assigned successfully. Username: ' . esc_html($username),
+            'updated'
+        );
     }
 }
 
@@ -169,6 +254,13 @@ function construction_mgmt_roles_manager_page() {
     ]);
 
     $construction_role_keys = array_keys($editable_roles);
+    $lower_roles = array_filter(
+        $editable_roles,
+        static function($role_data, $role_key) {
+            return construction_mgmt_is_lower_assignable_role($role_key);
+        },
+        ARRAY_FILTER_USE_BOTH
+    );
     $assigned_users = [];
     if (!empty($construction_role_keys)) {
         $assigned_users = get_users([
@@ -206,6 +298,48 @@ function construction_mgmt_roles_manager_page() {
                 </tr>
             </table>
             <?php submit_button('Create Role', 'primary', 'submit', false); ?>
+        </form>
+
+        <h2>Create User (Lower Access)</h2>
+        <form method="post" style="max-width: 900px; margin-bottom: 28px;">
+            <?php wp_nonce_field('construction_mgmt_roles_action'); ?>
+            <input type="hidden" name="construction_mgmt_roles_action" value="create_lower_user" />
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><label for="new_user_display_name">Display Name</label></th>
+                    <td><input type="text" name="new_user_display_name" id="new_user_display_name" class="regular-text" required /></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="new_user_email">Email</label></th>
+                    <td><input type="email" name="new_user_email" id="new_user_email" class="regular-text" required /></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="new_user_username">Username (optional)</label></th>
+                    <td>
+                        <input type="text" name="new_user_username" id="new_user_username" class="regular-text" />
+                        <p class="description">Leave blank to auto-generate from email.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="new_user_password">Password (optional)</label></th>
+                    <td>
+                        <input type="text" name="new_user_password" id="new_user_password" class="regular-text" autocomplete="new-password" />
+                        <p class="description">Leave blank to auto-generate a secure password.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="new_user_role">Construction Role</label></th>
+                    <td>
+                        <select name="new_user_role" id="new_user_role" required>
+                            <option value="">Select role</option>
+                            <?php foreach ($lower_roles as $role_key => $role_data) : ?>
+                                <option value="<?php echo esc_attr($role_key); ?>"><?php echo esc_html($role_data['name']); ?> (<?php echo esc_html($role_key); ?>)</option>
+                            <?php endforeach; ?>
+                        </select>
+                    </td>
+                </tr>
+            </table>
+            <?php submit_button('Create User', 'secondary', 'submit', false); ?>
         </form>
 
         <h2>Assign Role To User</h2>
