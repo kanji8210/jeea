@@ -137,6 +137,7 @@ function jinsing_handle_auth_login( WP_REST_Request $request ) {
         ],
         'capabilities' => [
             'readProjects' => user_can( $user, 'read_projects' ),
+            'createProjects' => user_can( $user, 'create_projects' ),
             'manageProjects' => user_can( $user, 'manage_construction_projects' ),
             'admin' => user_can( $user, 'manage_options' ),
         ],

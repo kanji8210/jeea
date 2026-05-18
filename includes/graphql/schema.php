@@ -77,18 +77,49 @@ add_action('graphql_register_types', function() {
         ],
     ]);
 
+    register_graphql_object_type('WpUserSummary', [
+        'description' => 'Lightweight WordPress user info for assignment pickers.',
+        'fields' => [
+            'id' => ['type' => 'Int'],
+            'userLogin' => ['type' => 'String'],
+            'userEmail' => ['type' => 'String'],
+            'displayName' => ['type' => 'String'],
+        ],
+    ]);
+
     register_graphql_object_type('ProjectDocument', [
         'description' => 'A project document with version control',
         'fields' => [
             'id' => ['type' => 'Int'],
             'projectId' => ['type' => 'Int'],
-            'documentType' => ['type' => 'String', 'description' => 'charter, schedule, budget, etc'],
+            'documentType' => [
+                'type' => 'String',
+                'description' => 'charter, schedule, budget, etc',
+                'resolve' => function($doc) {
+                    return $doc['document_type'] ?? null;
+                },
+            ],
             'title' => ['type' => 'String'],
-            'fileUrl' => ['type' => 'String'],
+            'fileUrl' => [
+                'type' => 'String',
+                'resolve' => function($doc) {
+                    return $doc['file_url'] ?? null;
+                },
+            ],
             'version' => ['type' => 'String'],
             'status' => ['type' => 'String', 'description' => 'draft, approved, archived'],
-            'createdBy' => ['type' => 'Int'],
-            'createdAt' => ['type' => 'String'],
+            'createdBy' => [
+                'type' => 'Int',
+                'resolve' => function($doc) {
+                    return isset($doc['created_by']) ? (int) $doc['created_by'] : 0;
+                },
+            ],
+            'createdAt' => [
+                'type' => 'String',
+                'resolve' => function($doc) {
+                    return $doc['created_at'] ?? null;
+                },
+            ],
         ],
     ]);
 
@@ -343,6 +374,40 @@ add_action('graphql_register_types', function() {
         }
     ]);
 
+    // Query: searchUsers — for team-member assignment pickers.
+    register_graphql_field('RootQuery', 'searchUsers', [
+        'type' => ['list_of' => 'WpUserSummary'],
+        'args' => [
+            'query' => ['type' => 'String', 'description' => 'Search term: username, display name, or email.'],
+            'limit' => ['type' => 'Int', 'description' => 'Max results (default 10, max 25).'],
+        ],
+        'resolve' => function($source, $args) {
+            if (!current_user_can('manage_construction_projects') && !current_user_can('manage_options')) {
+                return [];
+            }
+            $term = isset($args['query']) ? trim((string) $args['query']) : '';
+            $limit = isset($args['limit']) ? max(1, min(25, (int) $args['limit'])) : 10;
+            if (strlen($term) < 2) return [];
+
+            $users = get_users([
+                'search' => '*' . esc_attr($term) . '*',
+                'search_columns' => ['user_login', 'user_nicename', 'user_email', 'display_name'],
+                'number' => $limit,
+                'orderby' => 'display_name',
+                'order' => 'ASC',
+            ]);
+
+            return array_map(function($u) {
+                return [
+                    'id' => (int) $u->ID,
+                    'userLogin' => (string) $u->user_login,
+                    'userEmail' => (string) $u->user_email,
+                    'displayName' => (string) $u->display_name,
+                ];
+            }, $users);
+        }
+    ]);
+
     register_graphql_field('RootQuery', 'suppliers', [
         'type' => ['list_of' => 'Supplier'],
         'resolve' => function() {
@@ -390,6 +455,96 @@ add_action('graphql_register_types', function() {
             );
 
             return ['project' => construction_mgmt_get_project($project_id)];
+        }
+    ]);
+
+    register_graphql_mutation('updateProject', [
+        'inputFields' => [
+            'id' => ['type' => ['non_null' => 'Int'], 'description' => 'Project ID'],
+            'name' => ['type' => 'String'],
+            'description' => ['type' => 'String'],
+            'status' => ['type' => 'String', 'description' => 'planning|active|on_hold|completed|archived'],
+            'budgetTotal' => ['type' => 'Float'],
+            'budgetSpent' => ['type' => 'Float'],
+            'startDate' => ['type' => 'String', 'description' => 'YYYY-MM-DD'],
+            'endDate' => ['type' => 'String', 'description' => 'YYYY-MM-DD'],
+            'clientName' => ['type' => 'String'],
+            'location' => ['type' => 'String'],
+            'contractType' => ['type' => 'String'],
+            'currency' => ['type' => 'String'],
+            'budgetContingencyPct' => ['type' => 'Float'],
+            'qualityStandard' => ['type' => 'String'],
+        ],
+        'outputFields' => [
+            'success' => ['type' => 'Boolean'],
+            'message' => ['type' => 'String'],
+            'project' => ['type' => 'ConstructionProject'],
+        ],
+        'mutateAndGetPayload' => function($input, $context, $info) {
+            if (!current_user_can('manage_construction_projects') && !current_user_can('manage_options')) {
+                throw new \GraphQL\Error\UserError('Permission denied');
+            }
+
+            $project_id = isset($input['id']) ? (int) $input['id'] : 0;
+            if ($project_id <= 0) {
+                throw new \GraphQL\Error\UserError('Invalid project ID.');
+            }
+
+            $existing = construction_mgmt_get_project($project_id);
+            if (!$existing) {
+                throw new \GraphQL\Error\UserError('Project not found.');
+            }
+
+            $project_fields = [];
+            $key_map = [
+                'name' => 'name',
+                'description' => 'description',
+                'status' => 'status',
+                'budgetTotal' => 'budget_total',
+                'budgetSpent' => 'budget_spent',
+                'startDate' => 'start_date',
+                'endDate' => 'end_date',
+            ];
+            foreach ($key_map as $gql_key => $db_key) {
+                if (array_key_exists($gql_key, $input)) {
+                    $project_fields[$db_key] = $input[$gql_key];
+                }
+            }
+
+            if (!empty($project_fields)) {
+                $result = construction_mgmt_update_project($project_id, $project_fields);
+                if (is_wp_error($result)) {
+                    throw new \GraphQL\Error\UserError($result->get_error_message());
+                }
+            }
+
+            $metadata_fields = [];
+            $meta_map = [
+                'clientName' => 'client_name',
+                'location' => 'location',
+                'contractType' => 'contract_type',
+                'currency' => 'currency',
+                'budgetContingencyPct' => 'budget_contingency_pct',
+                'qualityStandard' => 'quality_standard',
+            ];
+            foreach ($meta_map as $gql_key => $db_key) {
+                if (array_key_exists($gql_key, $input)) {
+                    $metadata_fields[$db_key] = $input[$gql_key];
+                }
+            }
+
+            if (!empty($metadata_fields)) {
+                $meta_result = construction_mgmt_upsert_project_metadata($project_id, $metadata_fields);
+                if (is_wp_error($meta_result)) {
+                    throw new \GraphQL\Error\UserError($meta_result->get_error_message());
+                }
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Project updated successfully.',
+                'project' => construction_mgmt_get_project($project_id),
+            ];
         }
     ]);
 
@@ -518,6 +673,249 @@ add_action('graphql_register_types', function() {
                 'message' => 'Team member assigned successfully.',
             ];
         }
+    ]);
+
+    // Mutation: updateMilestone
+    register_graphql_mutation('updateMilestone', [
+        'inputFields' => [
+            'id' => ['type' => ['non_null' => 'Int']],
+            'title' => ['type' => 'String'],
+            'description' => ['type' => 'String'],
+            'phase' => ['type' => 'String'],
+            'dueDate' => ['type' => 'String'],
+            'completionDate' => ['type' => 'String'],
+            'status' => ['type' => 'String'],
+            'deliverables' => ['type' => 'String'],
+        ],
+        'outputFields' => [
+            'milestone' => ['type' => 'ProjectMilestone'],
+            'success' => ['type' => 'Boolean'],
+            'message' => ['type' => 'String'],
+        ],
+        'mutateAndGetPayload' => function($input) {
+            if (!current_user_can('manage_construction_projects')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+            $id = (int) ($input['id'] ?? 0);
+            if ($id <= 0) {
+                throw new \GraphQL\Error\UserError('Invalid milestone ID.');
+            }
+
+            $map = [
+                'title' => 'title',
+                'description' => 'description',
+                'phase' => 'phase',
+                'dueDate' => 'due_date',
+                'completionDate' => 'completion_date',
+                'status' => 'status',
+                'deliverables' => 'deliverables',
+            ];
+            $fields = [];
+            foreach ($map as $gql => $db) {
+                if (array_key_exists($gql, $input)) {
+                    $fields[$db] = $input[$gql];
+                }
+            }
+
+            $result = construction_mgmt_update_milestone($id, $fields);
+            if (is_wp_error($result)) {
+                throw new \GraphQL\Error\UserError($result->get_error_message());
+            }
+
+            return [
+                'milestone' => construction_mgmt_get_milestone($id),
+                'success' => true,
+                'message' => 'Milestone updated.',
+            ];
+        }
+    ]);
+
+    // Mutation: deleteMilestone
+    register_graphql_mutation('deleteMilestone', [
+        'inputFields' => [
+            'id' => ['type' => ['non_null' => 'Int']],
+        ],
+        'outputFields' => [
+            'success' => ['type' => 'Boolean'],
+            'deletedId' => ['type' => 'Int'],
+            'message' => ['type' => 'String'],
+        ],
+        'mutateAndGetPayload' => function($input) {
+            if (!current_user_can('manage_construction_projects')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+            $id = (int) ($input['id'] ?? 0);
+            if ($id <= 0) {
+                throw new \GraphQL\Error\UserError('Invalid milestone ID.');
+            }
+            $result = construction_mgmt_delete_milestone($id);
+            if (is_wp_error($result)) {
+                throw new \GraphQL\Error\UserError($result->get_error_message());
+            }
+            return [
+                'success' => (bool) $result,
+                'deletedId' => $id,
+                'message' => $result ? 'Milestone deleted.' : 'Milestone not found.',
+            ];
+        }
+    ]);
+
+    // Mutation: removeTeamMember
+    register_graphql_mutation('removeTeamMember', [
+        'inputFields' => [
+            'projectId' => ['type' => ['non_null' => 'Int']],
+            'userId' => ['type' => ['non_null' => 'Int']],
+        ],
+        'outputFields' => [
+            'success' => ['type' => 'Boolean'],
+            'message' => ['type' => 'String'],
+        ],
+        'mutateAndGetPayload' => function($input) {
+            if (!current_user_can('manage_construction_projects')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+            $project_id = (int) ($input['projectId'] ?? 0);
+            $user_id = (int) ($input['userId'] ?? 0);
+            $result = construction_mgmt_remove_team_member($project_id, $user_id);
+            if (is_wp_error($result)) {
+                throw new \GraphQL\Error\UserError($result->get_error_message());
+            }
+            return [
+                'success' => (bool) $result,
+                'message' => $result ? 'Team member removed.' : 'Team member not found.',
+            ];
+        }
+    ]);
+
+    // Mutation: createProjectDocument
+    register_graphql_mutation('createProjectDocument', [
+        'inputFields' => [
+            'projectId' => ['type' => ['non_null' => 'Int']],
+            'title' => ['type' => ['non_null' => 'String']],
+            'documentType' => ['type' => 'String'],
+            'fileUrl' => ['type' => 'String'],
+            'version' => ['type' => 'String'],
+            'status' => ['type' => 'String'],
+        ],
+        'outputFields' => [
+            'document' => ['type' => 'ProjectDocument'],
+            'success' => ['type' => 'Boolean'],
+            'message' => ['type' => 'String'],
+        ],
+        'mutateAndGetPayload' => function($input) {
+            if (!current_user_can('manage_construction_projects') && !current_user_can('manage_options')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+
+            $project_id = (int) ($input['projectId'] ?? 0);
+            if ($project_id <= 0) {
+                throw new \GraphQL\Error\UserError('Invalid project ID.');
+            }
+
+            $document_id = construction_mgmt_add_project_document($project_id, [
+                'title' => (string) ($input['title'] ?? ''),
+                'document_type' => (string) ($input['documentType'] ?? 'other'),
+                'file_url' => (string) ($input['fileUrl'] ?? ''),
+                'version' => (string) ($input['version'] ?? '1.0'),
+                'status' => (string) ($input['status'] ?? 'draft'),
+            ]);
+
+            if (is_wp_error($document_id)) {
+                throw new \GraphQL\Error\UserError($document_id->get_error_message());
+            }
+
+            return [
+                'document' => construction_mgmt_get_document($document_id),
+                'success' => true,
+                'message' => 'Document created successfully.',
+            ];
+        },
+    ]);
+
+    // Mutation: updateProjectDocument
+    register_graphql_mutation('updateProjectDocument', [
+        'inputFields' => [
+            'id' => ['type' => ['non_null' => 'Int']],
+            'title' => ['type' => 'String'],
+            'documentType' => ['type' => 'String'],
+            'fileUrl' => ['type' => 'String'],
+            'version' => ['type' => 'String'],
+            'status' => ['type' => 'String'],
+        ],
+        'outputFields' => [
+            'document' => ['type' => 'ProjectDocument'],
+            'success' => ['type' => 'Boolean'],
+            'message' => ['type' => 'String'],
+        ],
+        'mutateAndGetPayload' => function($input) {
+            if (!current_user_can('manage_construction_projects') && !current_user_can('manage_options')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+
+            $document_id = (int) ($input['id'] ?? 0);
+            if ($document_id <= 0) {
+                throw new \GraphQL\Error\UserError('Invalid document ID.');
+            }
+
+            $map = [
+                'title' => 'title',
+                'documentType' => 'document_type',
+                'fileUrl' => 'file_url',
+                'version' => 'version',
+                'status' => 'status',
+            ];
+
+            $fields = [];
+            foreach ($map as $gql_key => $db_key) {
+                if (array_key_exists($gql_key, $input)) {
+                    $fields[$db_key] = $input[$gql_key];
+                }
+            }
+
+            $result = construction_mgmt_update_document($document_id, $fields);
+            if (is_wp_error($result)) {
+                throw new \GraphQL\Error\UserError($result->get_error_message());
+            }
+
+            return [
+                'document' => construction_mgmt_get_document($document_id),
+                'success' => true,
+                'message' => 'Document updated successfully.',
+            ];
+        },
+    ]);
+
+    // Mutation: deleteProjectDocument
+    register_graphql_mutation('deleteProjectDocument', [
+        'inputFields' => [
+            'id' => ['type' => ['non_null' => 'Int']],
+        ],
+        'outputFields' => [
+            'success' => ['type' => 'Boolean'],
+            'deletedId' => ['type' => 'Int'],
+            'message' => ['type' => 'String'],
+        ],
+        'mutateAndGetPayload' => function($input) {
+            if (!current_user_can('manage_construction_projects') && !current_user_can('manage_options')) {
+                throw new \GraphQL\Error\UserError('Permission denied.');
+            }
+
+            $document_id = (int) ($input['id'] ?? 0);
+            if ($document_id <= 0) {
+                throw new \GraphQL\Error\UserError('Invalid document ID.');
+            }
+
+            $result = construction_mgmt_delete_document($document_id);
+            if (is_wp_error($result)) {
+                throw new \GraphQL\Error\UserError($result->get_error_message());
+            }
+
+            return [
+                'success' => (bool) $result,
+                'deletedId' => $document_id,
+                'message' => $result ? 'Document deleted.' : 'Document not found.',
+            ];
+        },
     ]);
 
     register_graphql_field('RootMutation', 'createSupplier', [

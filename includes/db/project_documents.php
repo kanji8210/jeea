@@ -70,14 +70,35 @@ function construction_mgmt_update_document($document_id, $data) {
         return new WP_Error('invalid_document', 'Invalid document ID.');
     }
 
+    $allowed_statuses = ['draft', 'approved', 'archived'];
     $update_data = [];
 
-    if (isset($data['status'])) {
-        $update_data['status'] = sanitize_text_field($data['status']);
+    if (array_key_exists('title', $data)) {
+        $title = sanitize_text_field((string) $data['title']);
+        if ($title === '') {
+            return new WP_Error('invalid_title', 'Document title cannot be empty.');
+        }
+        $update_data['title'] = $title;
     }
 
-    if (isset($data['version'])) {
-        $update_data['version'] = sanitize_text_field($data['version']);
+    if (array_key_exists('document_type', $data)) {
+        $update_data['document_type'] = sanitize_text_field((string) $data['document_type']);
+    }
+
+    if (array_key_exists('file_url', $data)) {
+        $update_data['file_url'] = esc_url_raw((string) $data['file_url']);
+    }
+
+    if (array_key_exists('status', $data)) {
+        $status = sanitize_text_field((string) $data['status']);
+        if (!in_array($status, $allowed_statuses, true)) {
+            return new WP_Error('invalid_status', 'Invalid document status.');
+        }
+        $update_data['status'] = $status;
+    }
+
+    if (array_key_exists('version', $data)) {
+        $update_data['version'] = sanitize_text_field((string) $data['version']);
     }
 
     if (empty($update_data)) {
@@ -85,7 +106,54 @@ function construction_mgmt_update_document($document_id, $data) {
     }
 
     $table = construction_mgmt_get_table_name('project_documents');
-    return $wpdb->update($table, $update_data, ['id' => $document_id]);
+    $result = $wpdb->update($table, $update_data, ['id' => $document_id]);
+
+    if ($result === false) {
+        return new WP_Error('document_update_failed', 'Unable to update document.');
+    }
+
+    return true;
+}
+
+function construction_mgmt_delete_document($document_id) {
+    global $wpdb;
+
+    $document_id = (int) $document_id;
+    if ($document_id <= 0) {
+        return new WP_Error('invalid_document', 'Invalid document ID.');
+    }
+
+    $table = construction_mgmt_get_table_name('project_documents');
+    $result = $wpdb->delete($table, ['id' => $document_id], ['%d']);
+    if ($result === false) {
+        return new WP_Error('document_delete_failed', 'Unable to delete document.');
+    }
+
+    return (bool) $result;
+}
+
+function construction_mgmt_get_document($document_id) {
+    global $wpdb;
+
+    $document_id = (int) $document_id;
+    if ($document_id <= 0) {
+        return null;
+    }
+
+    $table = construction_mgmt_get_table_name('project_documents');
+    $row = $wpdb->get_row(
+        $wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $document_id),
+        ARRAY_A
+    );
+
+    if (!$row) {
+        return null;
+    }
+
+    $row['id'] = (int) $row['id'];
+    $row['project_id'] = (int) $row['project_id'];
+    $row['created_by'] = (int) $row['created_by'];
+    return $row;
 }
 
 function construction_mgmt_generate_project_charter($project_id) {
