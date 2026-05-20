@@ -218,10 +218,6 @@ function construction_mgmt_apply_graphql_jwt_auth() {
 }
 
 function construction_mgmt_apply_cors_headers() {
-    if (!function_exists('graphql_get_wp_context')) {
-        return;
-    }
-
     $origin = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_url((string) $_SERVER['HTTP_ORIGIN']) : '';
     if ($origin === '') {
         return;
@@ -236,12 +232,20 @@ function construction_mgmt_apply_cors_headers() {
         'http://127.0.0.1:5175',
     ];
 
+    // Get configured frontend URL if set
+    $configured = trim((string) get_option('construction_mgmt_frontend_url', ''));
+    if ($configured !== '') {
+        $allowed_origins[] = rtrim($configured, '/');
+    }
+
     if (in_array($origin, $allowed_origins, true)) {
-        header('Access-Control-Allow-Origin: ' . $origin);
-        header('Access-Control-Allow-Credentials: true');
-        header('Access-Control-Allow-Methods: POST, GET, OPTIONS, HEAD, PUT, DELETE, PATCH');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept');
-        header('Access-Control-Max-Age: 86400');
+        // Use replace: true to override any existing wildcard headers from WPGraphQL
+        header('Access-Control-Allow-Origin: ' . $origin, true);
+        header('Access-Control-Allow-Credentials: true', true);
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS, HEAD, PUT, DELETE, PATCH', true);
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept', true);
+        header('Access-Control-Max-Age: 86400', true);
+        header('Vary: Origin', true);
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -250,6 +254,45 @@ function construction_mgmt_apply_cors_headers() {
     }
 }
 
-add_action('init', 'construction_mgmt_apply_cors_headers', 0);
-add_action('init', 'construction_mgmt_apply_graphql_jwt_auth', 1);
+// Run at highest priority to catch OPTIONS requests before WPGraphQL
+// Use 'wp' hook which runs earlier than 'init' for proper CORS handling
+add_action('wp', 'construction_mgmt_apply_cors_headers', -999);
+add_action('wp', 'construction_mgmt_apply_graphql_jwt_auth', -998);
 add_action('graphql_init', 'construction_mgmt_apply_graphql_jwt_auth', 1);
+
+// Also use 'graphql_response_headers_to_send' filter if available to ensure CORS headers on GraphQL responses
+if (function_exists('add_filter')) {
+    add_filter('graphql_response_headers_to_send', function($headers) {
+        $origin = isset($_SERVER['HTTP_ORIGIN']) ? sanitize_url((string) $_SERVER['HTTP_ORIGIN']) : '';
+        if ($origin === '') {
+            return $headers;
+        }
+
+        $allowed_origins = [
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'http://localhost:5175',
+            'http://127.0.0.1:5173',
+            'http://127.0.0.1:5174',
+            'http://127.0.0.1:5175',
+        ];
+
+        $configured = trim((string) get_option('construction_mgmt_frontend_url', ''));
+        if ($configured !== '') {
+            $allowed_origins[] = rtrim($configured, '/');
+        }
+
+        if (in_array($origin, $allowed_origins, true)) {
+            $headers['Access-Control-Allow-Origin'] = $origin;
+            $headers['Access-Control-Allow-Credentials'] = 'true';
+            $headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS, HEAD, PUT, DELETE, PATCH';
+            $headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept';
+            $headers['Access-Control-Max-Age'] = '86400';
+            $headers['Vary'] = 'Origin';
+            // Remove wildcard if present
+            unset($headers['*']);
+        }
+
+        return $headers;
+    }, -999);
+}
